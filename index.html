@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SBChat WhatsApp</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="groupChoice">
+    <b id="welcomeText">Chargement...</b>
+    <select id="groupSelect" style="padding:5px; border-radius:5px;"></select>
+</div>
+
+<div class="app">
+    <div class="header">
+        <div id="inboxBtn" onclick="showInbox()">
+            ✉️<span id="inboxCount">0</span>
+        </div>
+        
+        <b id="groupTitle">Aucun groupe</b>
+        
+        <div id="adminMenuBtn" onclick="toggleMenu()">⋮</div>
+        <div id="adminDropdown" class="dropdown-content">
+            <button onclick="ajouterMembre()">➕ Ajouter un membre</button>
+            <button onclick="listeMembres()">👥 Liste des membres</button>
+            <button onclick="messageUnMembre()">✉️ Message à un membre</button>
+            <button onclick="diffusionTous()">📢 Diffusion à tous</button>
+            <button onclick="exporterContacts()">📥 Exporter EXCEL (XLS)</button>
+        </div>
+    </div>
+    
+    <div class="messages" id="messages"></div>
+    
+    <div class="input-area-container">
+        <div class="input-area">
+            <input id="msgInput" placeholder="Tapez votre message ici...">
+            <button id="sendBtn" onclick="sendMessage()">➤</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script src="script.js" defer></script>
+
+</body>
+</html>
+
