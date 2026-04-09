@@ -1,0 +1,29 @@
+body{ margin:0; font-family:Arial; background:#efeae2; }
+#groupChoice{ background:white; padding:15px; text-align:center; border-bottom: 2px solid #25D366; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.app{ height:calc(100vh - 140px); display:flex; flex-direction:column; }
+
+/* HEADER AVEC ENVELOPPE ET MENU */
+.header{ background:#25D366; color:white; padding:10px; text-align:center; margin: 10px; border-radius: 25px; position: relative; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+/* Icône Enveloppe */
+#inboxBtn { position: absolute; left: 20px; cursor: pointer; font-size: 22px; display: flex; align-items: center; }
+#inboxCount { position: absolute; top: -5px; right: -10px; background: red; color: white; font-size: 10px; border-radius: 50%; padding: 2px 6px; display: none; border: 1px solid white; }
+
+#adminMenuBtn { position: absolute; right: 20px; cursor: pointer; font-size: 24px; display: none; }
+
+.dropdown-content { display: none; position: absolute; right: 10px; top: 55px; background-color: white; min-width: 200px; box-shadow: 0px 8px 16px rgba(0,0,0,0.2); z-index: 100; border-radius: 10px; overflow: hidden; }
+.dropdown-content button { width: 100%; padding: 12px; border: none; background: none; text-align: left; cursor: pointer; color: #333; border-bottom: 1px solid #eee; font-size: 14px; }
+.dropdown-content button:hover { background-color: #f1f1f1; }
+
+.messages{ flex:1; padding:10px; overflow-y:auto; display:flex; flex-direction:column; }
+.msg{ max-width:75%; padding:8px; margin:5px; border-radius:10px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
+.me{ background:#dcf8c6; align-self:flex-end; }
+.other{ background:white; align-self:flex-start; border: 1px solid #ddd; }
+.name{ font-size:11px; font-weight:bold; color: #075E54; margin-bottom: 3px; }
+.time{ font-size:10px; color:gray; text-align:right; margin-top: 3px; }
+
+.input-area-container { padding: 10px; background: #f0f0f0; margin-bottom: 1cm; }
+.input-area{ display:flex; align-items: center; }
+#msgInput{ flex:1; padding:12px; border-radius:25px; border:none; outline:none; }
+#sendBtn{ background:#25D366; color:white; border:none; padding:12px; border-radius:50%; margin-left:5px; cursor:pointer; width:45px; height:45px; display:flex; align-items:center; justify-content:center; }
+
