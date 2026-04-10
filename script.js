@@ -1,153 +1,176 @@
-const firebaseConfig = {
-  apiKey: "AIzaSyBTjE8yU0YFJZe9aqOiZuZ7CmBz08yHNhA",
-  authDomain: "sbagemachatgroup.firebaseapp.com",
-  projectId: "sbagemachatgroup",
-  storageBucket: "sbagemachatgroup.firebasestorage.app",
-  messagingSenderId: "169367319493",
-  appId: "1:169367319493:web:90d319eff0142d585651ac",
-  databaseURL: "https://sbagemachatgroup-default-rtdb.europe-west1.firebasedatabase.app/"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const SUPABASE_URL = 'https://jukfjoljkaoeicopjuwo.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_zvBTaDrffaATEPI7Wbu4OQ_w8ZR6chX';
+const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const admins = ["002290140804495", "002290140804494", "002290197479181", "002290167648919", "002290195618690"];
-let user = localStorage.getItem("chat_user") || "";
-let currentGroup = localStorage.getItem("chat_group") || "";
+const ADMINS_PHONES = ["002290140804495", "002290140804494", "002290197479181", "002290167648919", "002290195618690"];
+let currentUser = null;
+let currentProfile = null;
+let replyToId = null;
 
-function listenInbox() {
-    if(!user) return;
-    db.ref("inbox/" + user).on("value", (snap) => {
-        let count = snap.numChildren();
-        let badge = document.getElementById("inboxCount");
-        if(count > 0) {
-            badge.innerText = count;
-            badge.style.display = "block";
-        } else {
-            badge.style.display = "none";
-        }
-    });
-}
-
-function showInbox() {
-    db.ref("inbox/" + user).once("value", (snap) => {
-        let msgStr = "--- VOS MESSAGES PRIVÉS ---\n\n";
-        snap.forEach(child => {
-            let m = child.val();
-            msgStr += `De: ${m.from}\n${m.text}\n---\n`;
-        });
-        if(snap.numChildren() === 0) msgStr = "Aucun message privé.";
-        alert(msgStr);
-    });
-}
-
-function ajouterMembre() {
-    let num = prompt("Numéro à ajouter :");
-    let grp = prompt("Groupe ?", currentGroup);
-    if(num && grp) {
-        db.ref("membres/" + grp + "/" + num).set({ status: "actif", date: new Date().toLocaleDateString() });
-        alert("Ajouté !");
-    }
-}
-
-function listeMembres() {
-    db.ref("membres/" + currentGroup).once("value", (snap) => {
-        let l = "Membres (" + currentGroup + ") :\n";
-        snap.forEach(c => l += "- " + c.key + "\n");
-        alert(l);
-    });
-}
-
-function messageUnMembre() {
-    let num = prompt("Numéro destinataire :");
-    let msg = prompt("Message :");
-    if(num && msg) {
-        db.ref("inbox/" + num).push({ from: user, text: msg, time: new Date().toLocaleTimeString() });
-        alert("Envoyé !");
-    }
-}
-
-function diffusionTous() {
-    let msg = prompt("Message de diffusion :");
-    if(msg) {
-        db.ref("membres/" + currentGroup).once("value", (snap) => {
-            snap.forEach(c => {
-                db.ref("inbox/" + c.key).push({ from: user, text: "[DIFFUSION] " + msg });
-            });
-            alert("Diffusion terminée !");
-        });
-    }
-}
-
-function exporterContacts() {
-    db.ref("membres/" + currentGroup).once("value", (snap) => {
-        let d = [["Numéro", "Date"]];
-        snap.forEach(c => d.push([c.key, c.val().date || "Non spécifiée"]));
-        let ws = XLSX.utils.aoa_to_sheet(d);
-        let wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Membres");
-        XLSX.writeFile(wb, "Contacts_" + currentGroup + ".xlsx");
-    });
-}
-
-function askUser() {
-    if (!user) {
-        let e = prompt("Numéro :");
-        if (e && /^[0-9]{8,15}$/.test(e.trim())) {
-            user = e.trim();
-            localStorage.setItem("chat_user", user);
-        } else { askUser(); return; }
-    }
-    setupInterface();
-    listenInbox();
-}
-
-function setupInterface() {
-    const welcomeDiv = document.getElementById("groupChoice");
-    const isAdmin = admins.includes(user);
-    if (isAdmin) document.getElementById("adminMenuBtn").style.display = "block";
-
-    if (currentGroup && !isAdmin) {
-        welcomeDiv.innerHTML = `<b>Salut ${user} !</b> <span style="color:#25D366;">${currentGroup}</span>`;
+// --- INITIALISATION ---
+async function checkSession() {
+    const { data } = await _supabase.auth.getSession();
+    if (data.session) {
+        currentUser = data.session.user;
+        const { data: prof } = await _supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+        currentProfile = prof;
+        showView('page-chat');
+        loadChat();
+        listenRealtime();
+        updateInboxBadge();
     } else {
-        welcomeDiv.innerHTML = `<b>Groupe :</b> <select id="groupSelect" style="padding:5px;"></select>`;
-        let s = document.getElementById("groupSelect");
-        for(let i=1; i<=10; i++){
-            let o = document.createElement("option"); o.value = "Groupe "+i; o.textContent = i;
-            if(currentGroup === "Groupe "+i) o.selected = true;
-            s.appendChild(o);
-        }
-        s.onchange = function(){ 
-            currentGroup = this.value; 
-            localStorage.setItem("chat_group", currentGroup);
-            db.ref("membres/" + currentGroup + "/" + user).update({ date: new Date().toLocaleDateString() });
-            location.reload(); 
-        };
+        showView('page-login');
     }
-    if(currentGroup) loadChat();
 }
 
-function sendMessage(){
-    let v = document.getElementById("msgInput").value;
-    if(!v.trim() || !currentGroup) return;
-    db.ref("messages/" + currentGroup).push({ text: v, name: user, time: new Date().getHours() + ":" + String(new Date().getMinutes()).padStart(2,'0') });
-    document.getElementById("msgInput").value = "";
+// --- NAVIGATION (SANS POPUP) ---
+function showView(viewId) {
+    document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+    document.getElementById(viewId).style.display = 'flex';
+    if(viewId === 'page-members') loadMembers();
+    if(viewId === 'page-inbox') loadInbox();
 }
 
-function loadChat() {
-    document.getElementById("groupTitle").innerText = "Discussion : " + currentGroup;
-    db.ref("messages/" + currentGroup).on("value", (snap) => {
-        let box = document.getElementById("messages"); box.innerHTML = "";
-        snap.forEach(c => {
-            let m = c.val();
-            let d = document.createElement("div");
-            d.className = "msg " + (m.name === user ? "me" : "other");
-            d.innerHTML = `<div class="name">${m.name} ${admins.includes(m.name)?'⭐':''}</div><div>${m.text}</div><div class="time">${m.time}</div>`;
-            box.appendChild(d);
+// --- AUTHENTIFICATION (Point 1) ---
+async function handleAuth() {
+    const phone = document.getElementById('auth-phone').value;
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+
+    if(!phone || !email || !password) return alert("Remplissez tous les champs.");
+
+    // Tentative de connexion
+    let { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+        // Si échec, on crée le compte
+        const { data: upData, error: upError } = await _supabase.auth.signUp({
+            email, password, options: { data: { phone: phone } }
         });
+        if (upError) return alert(upError.message);
+        
+        // Créer le profil dans notre table 'profiles'
+        await _supabase.from('profiles').insert([{ id: upData.user.id, phone: phone, email: email }]);
+        alert("Compte créé ! Recliquez sur connexion.");
+    } else {
+        location.reload();
+    }
+}
+
+// --- COMPRESSION PHOTO (Point 3) ---
+async function compressImg(file) {
+    return new Promise(res => {
+        const reader = new FileReader(); reader.readAsDataURL(file);
+        reader.onload = e => {
+            const img = new Image(); img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const max = 800; let w = img.width, h = img.height;
+                if(w > max){ h *= max/w; w = max; }
+                canvas.width = w; canvas.height = h;
+                ctx.drawImage(img, 0, 0, w, h);
+                canvas.toBlob(blob => res(blob), 'image/jpeg', 0.7);
+            }
+        }
+    });
+}
+
+// --- ENVOI MESSAGE (Point 3, 9) ---
+async function handleSend() {
+    if(currentProfile.is_banned) return alert("Vous n'avez plus le droit d'écrire.");
+    const content = document.getElementById('msgInput').value;
+    const file = document.getElementById('file-input').files[0];
+    let url = null;
+
+    if(file) {
+        const blob = await compressImg(file);
+        const name = `${Date.now()}.jpg`;
+        await _supabase.storage.from('chat-media').upload(name, blob);
+        url = _supabase.storage.from('chat-media').getPublicUrl(name).data.publicUrl;
+    }
+
+    if(!content && !url) return;
+
+    await _supabase.from('messages').insert([{
+        sender_id: currentUser.id, sender_phone: currentProfile.phone,
+        content, image_url: url, reply_to_id: replyToId,
+        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+    }]);
+
+    document.getElementById('msgInput').value = "";
+    document.getElementById('file-input').value = "";
+    cancelReply();
+}
+
+// --- AFFICHAGE CHAT (Point 11, 9) ---
+function loadChat() {
+    _supabase.from('messages').select('*').order('id', {ascending: true}).then(({data}) => {
+        const box = document.getElementById('chat-box');
+        box.innerHTML = "";
+        if(data) data.forEach(m => renderMsg(m));
         box.scrollTop = box.scrollHeight;
     });
 }
 
-function toggleMenu() { let m = document.getElementById("adminDropdown"); m.style.display = m.style.display==="block"?"none":"block"; }
-askUser();
-      
+function renderMsg(m) {
+    const isAdmin = ADMINS_PHONES.includes(currentProfile.phone);
+    const box = document.getElementById('chat-box');
+    const div = document.createElement('div');
+    div.className = `msg ${m.sender_id === currentUser.id ? 'me' : 'other'}`;
+    
+    div.innerHTML = `
+        <div class="msg-header" onclick="setReply(${m.id}, '${m.sender_phone}')">
+            <b>${m.sender_phone}</b>
+            ${isAdmin ? `<span class="del-btn" onclick="deleteMsg(${m.id})">🗑️</span>` : ''}
+        </div>
+        ${m.reply_to_id ? `<div class="reply-tag">Réponse au message #${m.reply_to_id}</div>` : ''}
+        ${m.image_url ? `<img src="${m.image_url}" class="chat-img">` : ''}
+        <p>${m.content || ''}</p>
+        <small>${m.time}</small>
+    `;
+    box.appendChild(div);
+}
+
+// --- MODÉRATION (Point 10, 11) ---
+async function deleteMsg(id) {
+    if(confirm("Supprimer ce message ?")) {
+        await _supabase.from('messages').delete().eq('id', id);
+        location.reload();
+    }
+}
+
+async function toggleBan(id, status) {
+    await _supabase.from('profiles').update({ is_banned: !status }).eq('id', id);
+    loadMembers();
+}
+
+// --- LISTE MEMBRES & INBOX (Point 5, 7, 8) ---
+async function loadMembers() {
+    const {data} = await _supabase.from('profiles').select('*');
+    const list = document.getElementById('members-list');
+    list.innerHTML = "";
+    data.forEach(m => {
+        const div = document.createElement('div');
+        div.className = "member-row";
+        div.innerHTML = `
+            <span>${m.phone} ${m.is_banned ? '🚫' : ''}</span>
+            <div>
+                <button onclick="openEditor('${m.id}', '${m.phone}')">✉️</button>
+                ${ADMINS_PHONES.includes(currentProfile.phone) ? `<button onclick="toggleBan('${m.id}', ${m.is_banned})">🚫</button>` : ''}
+            </div>
+        `;
+        list.appendChild(div);
+    });
+}
+
+// --- GESTION DU TEMPS RÉEL ---
+function listenRealtime() {
+    _supabase.channel('room1').on('postgres_changes', {event:'INSERT', schema:'public', table:'messages'}, payload => {
+        renderMsg(payload.new);
+        const box = document.getElementById('chat-box');
+        box.scrollTop = box.scrollHeight;
+    }).subscribe();
+}
+
+checkSession();
