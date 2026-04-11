@@ -173,4 +173,24 @@ function listenRealtime() {
     }).subscribe();
 }
 
+// Fonction pour ouvrir/fermer le menu admin
+function toggleMenu() {
+    const dropdown = document.getElementById('adminDropdown');
+    if (dropdown.style.display === "block") {
+        dropdown.style.display = "none";
+    } else {
+        dropdown.style.display = "block";
+    }
+}
+
+// Fermer le menu si on clique ailleurs sur l'écran
+window.onclick = function(event) {
+    if (!event.target.matches('#adminMenuBtn')) {
+        const dropdown = document.getElementById('adminDropdown');
+        if (dropdown && dropdown.style.display === "block") {
+            dropdown.style.display = "none";
+        }
+    }
+}
+
 checkSession();
