@@ -1,5 +1,5 @@
 const SUPABASE_URL = 'https://jukfjoljkaoeicopjuwo.supabase.co';
-const SUPABASE_KEY = 'votre_cle_ici'; // Remets TA clé ici
+const SUPABASE_KEY = 'sb_publishable_zvBTaDrffaATEPI7Wbu4OQ_w8ZR6chX'; // Remets TA clé ici
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const ADMINS_PHONES = ["002290140804495", "002290140804494", "002290196479181", "002290167648919", "002290195618690"];
