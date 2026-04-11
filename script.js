@@ -2,7 +2,7 @@ const SUPABASE_URL = 'https://jukfjoljkaoeicopjuwo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_zvBTaDrffaATEPI7Wbu4OQ_w8ZR6chX';
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const ADMINS_PHONES = ["002290140804495", "002290140804494", "002290197479181", "002290167648919", "002290195618690"];
+const ADMINS_PHONES = ["002290140804495", "002290140804494", "002290196479181", "002290167648919", "002290195618690"];
 let currentUser = null;
 let currentProfile = null;
 let replyToId = null;
