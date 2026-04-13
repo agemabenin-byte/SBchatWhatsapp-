@@ -381,3 +381,5 @@ async function checkSession() {
         showView('page-login');
     }
 }
+
+checkSession();
