@@ -278,7 +278,6 @@ async function executeSendPrivate() {
     goBack();
 }
     
-}
 function togglePass(fieldId, icon) {
     const field = document.getElementById(fieldId);
     if (field.type === "password") {
