@@ -360,4 +360,24 @@ async function handleForgotPassword() {
     }
 }
 
-checkSession();
+async function checkSession() {
+    // 1. On vérifie IMMEDIATEMENT si l'URL contient un jeton de récupération
+    const hash = window.location.hash;
+    
+    // Si l'URL contient "type=recovery" ou "access_token"
+    if (hash && (hash.includes("type=recovery") || hash.includes("access_token"))) {
+        console.log("Lien de récupération détecté !");
+        showView('page-reset'); // On affiche la page du nouveau mot de passe
+        return; // ON S'ARRÊTE ICI : ne pas charger la session normale
+    }
+
+    // 2. Sinon, on continue la vérification normale
+    const { data } = await _supabase.auth.getSession();
+    if (data.session) {
+        currentUser = data.session.user;
+        // ... le reste de ton code pour charger le profil ...
+        showView('page-chat');
+    } else {
+        showView('page-login');
+    }
+}
