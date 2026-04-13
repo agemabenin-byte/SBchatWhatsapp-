@@ -35,7 +35,7 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
     padding: 10px;
     /* MARGE DE SÉCURITÉ : On ajoute 80px en bas pour que le dernier message 
        ne soit jamais caché par la barre d'envoi fixe */
-    padding-bottom: 150px !important; 
+    padding-bottom: 100px !important; 
     -webkit-overflow-scrolling: touch;
 }
 
