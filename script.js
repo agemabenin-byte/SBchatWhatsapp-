@@ -361,7 +361,6 @@ async function handleForgotPassword() {
 }
 
 // --- INITIALISATION ---
-// --- INITIALISATION ---
 async function checkSession() {
     console.log("Vérification initiale...");
     
