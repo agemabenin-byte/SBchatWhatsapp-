@@ -107,7 +107,7 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
     width: 90%;
     max-width: 300px;
     padding: 12px;
-    margin: 8px 0;
+    margin: 8px auto;
     border-radius: 8px;
     border: 1px solid #ccc;
     outline: none;
