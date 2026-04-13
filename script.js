@@ -362,49 +362,78 @@ async function handleForgotPassword() {
 
 // --- INITIALISATION ---
 async function checkSession() {
-    console.log("Vérification de la session...");
+    console.log("Vérification de la session en cours...");
+    
+    // On récupère les deux types de données possibles dans l'URL
     const hash = window.location.hash;
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Debug pour voir ce que le navigateur reçoit
     console.log("Hash détecté :", hash);
+    console.log("Paramètres détectés :", urlParams.toString());
 
-    // 1. DÉTECTION PRIORITAIRE DU LIEN DE RÉCUPÉRATION
-    // On vérifie si l'URL contient les jetons de Supabase
-    if (hash && (hash.includes("type=recovery") || hash.includes("access_token") || hash.includes("recovery_token"))) {
-        console.log("🚀 LIEN DE RÉCUPÉRATION DÉTECTÉ !");
+    // 1. DÉTECTION PRIORITAIRE DU LIEN DE RÉCUPÉRATION (Reset Password)
+    // On cherche 'type=recovery' ou 'access_token' dans le HASH (#) ou dans les PARAMÈTRES (?)
+    const isRecovery = hash.includes("type=recovery") || 
+                       urlParams.get('type') === 'recovery' || 
+                       hash.includes("access_token") ||
+                       urlParams.has('recovery_token');
+
+    if (isRecovery) {
+        console.log("🚀 LIEN DE RÉCUPÉRATION DÉTECTÉ ! Redirection vers page-reset.");
         
-        // On force l'affichage de la page reset
+        // On affiche la page reset
         showView('page-reset');
         
-        // Optionnel : On peut même forcer un petit délai pour être sûr que le CSS est chargé
+        // Forçage visuel de sécurité (au cas où la navigation lag)
         setTimeout(() => {
             document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-            document.getElementById('page-reset').style.display = 'flex';
-        }, 100);
+            const resetPage = document.getElementById('page-reset');
+            if(resetPage) {
+                resetPage.style.display = 'flex';
+            } else {
+                console.error("Erreur : L'ID 'page-reset' n'existe pas dans ton HTML !");
+            }
+        }, 200);
         
-        return; // ARRÊT CRITIQUE : on ne vérifie pas le reste
+        return; // ARRÊT : On ne va pas plus loin pour ne pas finir sur la page login
     }
 
-    // 2. VÉRIFICATION NORMALE
+    // 2. VÉRIFICATION NORMALE (Session active)
     const { data, error } = await _supabase.auth.getSession();
     
     if (data && data.session) {
+        console.log("Session active trouvée pour :", data.session.user.email);
         currentUser = data.session.user;
-        const { data: prof } = await _supabase.from('profiles').select('*').eq('id', currentUser.id).single();
-        currentProfile = prof;
         
-        const welcome = document.getElementById('welcomeText');
-        if(welcome) welcome.innerText = `Salut ${prof.phone}`;
-        
-        showView('page-chat');
-        loadChat();
-        listenRealtime();
+        // Récupération du profil dans ta table personnalisée
+        const { data: prof, error: profErr } = await _supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', currentUser.id)
+            .single();
+            
+        if (prof) {
+            currentProfile = prof;
+            const welcome = document.getElementById('welcomeText');
+            if(welcome) welcome.innerText = `Salut ${prof.phone}`;
+            
+            showView('page-chat');
+            loadChat();
+            listenRealtime();
+        } else {
+            console.error("Profil non trouvé dans la table profiles", profErr);
+            showView('page-login');
+        }
     } else {
-        console.log("Aucune session, direction login.");
+        console.log("Aucune session détectée, direction page-login.");
         showView('page-login');
     }
 }
 
-// Appeler la fonction immédiatement au chargement
+// Lancement automatique au chargement
 window.onload = () => {
     checkSession();
 };
+
 checkSession();
