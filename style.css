@@ -20,7 +20,7 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
     margin: 5px; 
     border-radius: 20px; 
     display: flex; 
-    justify-content: space-between; 
+    justify-content: center; 
     align-items: center; 
     box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
     z-index: 10;
