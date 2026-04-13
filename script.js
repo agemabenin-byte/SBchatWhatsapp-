@@ -215,14 +215,15 @@ async function handleLoginAction() {
     checkSession();
 }
 
-// Action d'INSCRIPTION pure
+// Action d'INSCRIPTION pure (Version Corrigée)
 async function handleRegisterAction() {
-    const phone = document.getElementById('auth-phone').value;
-    const email = document.getElementById('reg-email').value;
+    const phone = document.getElementById('auth-phone').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
     const password = document.getElementById('reg-password').value;
 
     if(!phone || !email || !password) return alert("Remplissez tout pour l'inscription !");
 
+    // 1. Création du compte dans le système d'authentification Supabase
     const { data, error } = await _supabase.auth.signUp({ 
         email, 
         password, 
@@ -231,11 +232,24 @@ async function handleRegisterAction() {
 
     if (error) return alert(error.message);
 
-    // Création du profil dans ta table 'profiles'
+    // 2. Création du profil public dans TA table 'profiles'
     if(data.user) {
-        await _supabase.from('profiles').insert([{ id: data.user.id, phone: phone }]);
-        alert("Inscription réussie ! Un mail de confirmation vous a été envoyé. Validez-le puis connectez-vous.");
-        toggleAuthMode(false); // On renvoie l'utilisateur vers la page de connexion
+        // ON AJOUTE L'EMAIL ICI POUR LA RÉCUPÉRATION FUTURE
+        const { error: profileError } = await _supabase.from('profiles').insert([
+            { 
+                id: data.user.id, 
+                phone: phone, 
+                email: email // <--- Très important !
+            }
+        ]);
+
+        if(profileError) {
+            console.error("Erreur profil:", profileError);
+            return alert("Compte créé, mais erreur lors de l'enregistrement du profil.");
+        }
+
+        alert("Inscription réussie ! Un mail de confirmation vous a été envoyé à " + email + ". Validez-le pour pouvoir vous connecter.");
+        toggleAuthMode(false); 
     }
 }
 
