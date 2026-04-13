@@ -362,42 +362,42 @@ async function handleForgotPassword() {
 
 // --- INITIALISATION ---
 async function checkSession() {
-    console.log("Vérification initiale...");
-    
-    // 1. ÉCOUTER LES CHANGEMENTS D'AUTH (Méthode la plus fiable)
+    console.log("Démarrage de la vérification de session...");
+
+    // 1. ÉCOUTEUR D'ÉVÉNEMENTS AUTH (La méthode la plus robuste)
     _supabase.auth.onAuthStateChange((event, session) => {
-        console.log("Événement Auth détecté :", event);
+        console.log("Événement Supabase détecté :", event);
         
-        if (event === 'PASSWORD_RECOVERY') {
-            console.log("🚀 ÉVÉNEMENT RECOVERY DÉTECTÉ !");
+        if (event === "PASSWORD_RECOVERY") {
+            console.log("🚀 ÉVÉNEMENT RECOVERY DÉTECTÉ via onAuthStateChange !");
             showView('page-reset');
             return;
         }
     });
 
-    // 2. ANALYSE DE L'URL (Lecture directe)
+    // 2. ANALYSE MANUELLE DE L'URL (En secours)
     const hash = window.location.hash;
     const urlParams = new URLSearchParams(window.location.search);
     
     if (hash.includes("type=recovery") || urlParams.get('type') === 'recovery' || hash.includes("access_token")) {
-        console.log("🚀 PARAMÈTRES RECOVERY DÉTECTÉS !");
+        console.log("🚀 PARAMÈTRES RECOVERY DÉTECTÉS dans l'URL !");
         showView('page-reset');
-        return;
+        return; // On s'arrête là
     }
 
-    // 3. VÉRIFICATION NORMALE
+    // 3. VÉRIFICATION DE SESSION CLASSIQUE
     const { data } = await _supabase.auth.getSession();
-    if (data && data.session) {
-        // Si on est déjà en train d'afficher la page reset, on ne redirige pas vers le chat
-        if (viewHistory[viewHistory.length - 1] === 'page-reset') return;
+    
+    if (data.session) {
+        // Sécurité : si on vient d'afficher la page reset, on n'envoie pas vers le chat
+        if (document.getElementById('page-reset').style.display === 'flex') return;
 
         currentUser = data.session.user;
         const { data: prof } = await _supabase.from('profiles').select('*').eq('id', currentUser.id).single();
         
         if (prof) {
             currentProfile = prof;
-            const welcome = document.getElementById('welcomeText');
-            if(welcome) welcome.innerText = `Salut ${prof.phone}`;
+            document.getElementById('welcomeText').innerText = `Salut ${prof.phone}`;
             showView('page-chat');
             loadChat();
             listenRealtime();
@@ -405,11 +405,15 @@ async function checkSession() {
             showView('page-login');
         }
     } else {
-        // Si aucun paramètre de récupération n'est présent, on va au login
+        // Si aucun paramètre de récupération n'est là, on va au login
         showView('page-login');
     }
 }
 
+// Lancement au chargement de la fenêtre
+window.onload = () => {
+    checkSession();
+};
 // On lance la vérification dès que le script est chargé
 checkSession();
 
