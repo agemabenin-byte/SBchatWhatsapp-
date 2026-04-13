@@ -360,6 +360,23 @@ async function handleForgotPassword() {
     }
 }
 
+async function handleUpdatePassword() {
+    const newPassword = document.getElementById('new-password-input').value;
+    
+    if(!newPassword || newPassword.length < 6) {
+        return alert("Veuillez entrer un mot de passe d'au moins 6 caractères.");
+    }
+
+    const { error } = await _supabase.auth.updateUser({ password: newPassword });
+
+    if (error) {
+        alert("Erreur lors de la mise à jour : " + error.message);
+    } else {
+        alert("Succès ! Votre mot de passe a été modifié. Vous pouvez maintenant vous connecter.");
+        showView('page-login');
+    }
+}
+
 // --- INITIALISATION ---
 async function checkSession() {
     console.log("Démarrage de la vérification de session...");
