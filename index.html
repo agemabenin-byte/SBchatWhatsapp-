@@ -17,6 +17,7 @@
         <input type="email" id="auth-email" placeholder="Email">
           <div class="password-container">
         <input type="password" id="auth-password" placeholder="Mot de passe">
+        <span class="toggle-password" onclick="togglePass('auth-password', this)">👁️</span>
           </div>
         <button onclick="handleLoginAction()" style="background: #25D366;">Se Connecter</button>
         <p style="font-size: 14px; margin-top: 15px;">
@@ -29,6 +30,7 @@
         <input type="email" id="reg-email" placeholder="Email">
            <div class="password-container">   
         <input type="password" id="reg-password" placeholder="Mot de passe">
+        <span class="toggle-password" onclick="togglePass('reg-password', this)">👁️</span>
            </div>
         <button onclick="handleRegisterAction()" style="background: #075E54;">S'inscrire</button>
         <p style="font-size: 14px; margin-top: 15px;">
