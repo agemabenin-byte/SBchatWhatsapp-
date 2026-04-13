@@ -33,8 +33,10 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
     display: flex; 
     flex-direction: column; 
     padding: 10px;
-    /* On s'assure que la zone ne dépasse pas */
-    max-height: calc(100vh - 180px);
+    /* MARGE DE SÉCURITÉ : On ajoute 80px en bas pour que le dernier message 
+       ne soit jamais caché par la barre d'envoi fixe */
+    padding-bottom: 80px !important; 
+    -webkit-overflow-scrolling: touch;
 }
 
 .msg { 
