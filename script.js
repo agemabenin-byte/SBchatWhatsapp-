@@ -286,5 +286,15 @@ function togglePasswordVisibility(inputId) {
     // Optionnel : Changer l'icône selon l'état
     // event.target.innerText = type === 'password' ? '👁️' : '🙈';
 }
+function togglePass(fieldId, icon) {
+    const field = document.getElementById(fieldId);
+    if (field.type === "password") {
+        field.type = "text";
+        icon.innerText = "🔒"; // Change l'icône quand c'est visible
+    } else {
+        field.type = "password";
+        icon.innerText = "👁️";
+    }
+}
 
 checkSession();
