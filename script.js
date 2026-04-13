@@ -360,26 +360,52 @@ async function handleForgotPassword() {
     }
 }
 
+// --- INITIALISATION ---
 async function checkSession() {
-    // 1. On vérifie IMMEDIATEMENT si l'URL contient un jeton de récupération
+    console.log("Vérification de la session...");
     const hash = window.location.hash;
-    
-    // Si l'URL contient "type=recovery" ou "access_token"
-    if (hash && (hash.includes("type=recovery") || hash.includes("access_token"))) {
-        console.log("Lien de récupération détecté !");
-        showView('page-reset'); // On affiche la page du nouveau mot de passe
-        return; // ON S'ARRÊTE ICI : ne pas charger la session normale
+    console.log("Hash détecté :", hash);
+
+    // 1. DÉTECTION PRIORITAIRE DU LIEN DE RÉCUPÉRATION
+    // On vérifie si l'URL contient les jetons de Supabase
+    if (hash && (hash.includes("type=recovery") || hash.includes("access_token") || hash.includes("recovery_token"))) {
+        console.log("🚀 LIEN DE RÉCUPÉRATION DÉTECTÉ !");
+        
+        // On force l'affichage de la page reset
+        showView('page-reset');
+        
+        // Optionnel : On peut même forcer un petit délai pour être sûr que le CSS est chargé
+        setTimeout(() => {
+            document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+            document.getElementById('page-reset').style.display = 'flex';
+        }, 100);
+        
+        return; // ARRÊT CRITIQUE : on ne vérifie pas le reste
     }
 
-    // 2. Sinon, on continue la vérification normale
-    const { data } = await _supabase.auth.getSession();
-    if (data.session) {
+    // 2. VÉRIFICATION NORMALE
+    const { data, error } = await _supabase.auth.getSession();
+    
+    if (data && data.session) {
         currentUser = data.session.user;
-        // ... le reste de ton code pour charger le profil ...
+        const { data: prof } = await _supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+        currentProfile = prof;
+        
+        const welcome = document.getElementById('welcomeText');
+        if(welcome) welcome.innerText = `Salut ${prof.phone}`;
+        
         showView('page-chat');
+        loadChat();
+        listenRealtime();
     } else {
+        console.log("Aucune session, direction login.");
         showView('page-login');
     }
 }
+
+// Appeler la fonction immédiatement au chargement
+window.onload = () => {
+    checkSession();
+};
 
 checkSession();
