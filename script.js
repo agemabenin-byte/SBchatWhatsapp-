@@ -210,6 +210,8 @@ async function handleLogout() {
 // --- CHARGER LA LISTE DES MEMBRES ---
 async function loadMembers() {
     const list = document.getElementById('members-list');
+    if (!list) return; // Sécurité pour éviter les bugs
+    
     list.innerHTML = "<p style='text-align:center;'>Chargement des membres...</p>";
 
     // Récupération des données depuis Supabase
@@ -227,10 +229,12 @@ async function loadMembers() {
         const div = document.createElement('div');
         div.className = 'member-row';
         div.style = "background:white; margin:10px; padding:15px; border-radius:12px; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
+        
+        // Correction ici : On utilise des ` au lieu de ' pour éviter le bug de "d'email"
         div.innerHTML = `
             <div>
                 <b style="color:#075E54;">${member.phone}</b><br>
-                <small style="color:gray;">${member.email || 'Pas d'email'}</small>
+                <small style="color:gray;">${member.email || "Pas d'email"}</small>
             </div>
             <button onclick="openPrivate('${member.id}', '${member.phone}')" style="background:#25D366; color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer;">✉️</button>
         `;
