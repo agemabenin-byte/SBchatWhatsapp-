@@ -186,13 +186,31 @@ function toggleAuthMode(isRegister) {
 
 // Action de CONNEXION pure
 async function handleLoginAction() {
-    const email = document.getElementById('auth-email').value;
+    let input = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
 
-    if(!email || !password) return alert("Veuillez remplir les champs !");
+    if(!input || !password) return alert("Veuillez remplir tous les champs !");
 
-    const { error } = await _supabase.auth.signInWithPassword({ email, password });
-    if (error) return alert("Erreur : " + error.message);
+    let loginEmail = input;
+
+    // Si c'est un numéro, on récupère le mail pour Supabase
+    if (!input.includes("@")) {
+        const { data } = await _supabase
+            .from('profiles')
+            .select('email')
+            .eq('phone', input)
+            .single();
+        
+        if (!data) return alert("Numéro inconnu.");
+        loginEmail = data.email;
+    }
+
+    const { error } = await _supabase.auth.signInWithPassword({ 
+        email: loginEmail, 
+        password: password 
+    });
+
+    if (error) return alert("Connexion échouée : " + error.message);
     
     checkSession();
 }
@@ -290,20 +308,41 @@ function togglePass(fieldId, icon) {
 }
 
 async function handleForgotPassword() {
-    const email = document.getElementById('auth-email').value;
+    let input = document.getElementById('auth-email').value.trim();
 
-    if (!email) {
-        return alert("Veuillez d'abord saisir votre adresse email dans le champ ci-dessus.");
+    if (!input) {
+        return alert("Veuillez saisir votre numéro ou votre email.");
     }
 
-    const { error } = await _supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin, // Renvoie l'utilisateur sur ton site après le clic
+    let emailToSend = input;
+
+    // Si l'entrée ne contient pas de "@", on considère que c'est un numéro
+    if (!input.includes("@")) {
+        console.log("Recherche de l'email associé au numéro :", input);
+        
+        // On cherche dans la table 'profiles' le mail correspondant au numéro
+        const { data, error } = await _supabase
+            .from('profiles')
+            .select('email') // Assure-toi que ta table profiles a une colonne email
+            .eq('phone', input)
+            .single();
+
+        if (error || !data) {
+            return alert("Aucun compte trouvé avec ce numéro. Vérifiez votre saisie.");
+        }
+        
+        emailToSend = data.email;
+    }
+
+    // Envoi du mail de récupération via Supabase
+    const { error: resetError } = await _supabase.auth.resetPasswordForEmail(emailToSend, {
+        redirectTo: window.location.origin,
     });
 
-    if (error) {
-        alert("Erreur : " + error.message);
+    if (resetError) {
+        alert("Erreur : " + resetError.message);
     } else {
-        alert("Un e-mail de récupération a été envoyé à " + email + ". Vérifiez votre boîte de réception (et les spams).");
+        alert("Succès ! Un lien de récupération a été envoyé à l'adresse associée : " + emailToSend);
     }
 }
 
