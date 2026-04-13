@@ -129,3 +129,26 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
 }
 
 #page-login h2 { color: #075E54; margin-bottom: 5px; }
+
+.password-container {
+    width: 85%;
+    max-width: 300px;
+    position: relative; /* Pour que l'œil se place par rapport à ce bloc */
+    margin: 8px auto;   /* Garde le centrage parfait */
+}
+
+.password-container input {
+    width: 100% !important; /* Prend toute la place du conteneur */
+    margin: 0 !important;   /* Annule la marge ici car elle est sur le parent */
+    padding-right: 40px;    /* Laisse de la place pour l'icône à droite */
+}
+
+.toggle-password {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    font-size: 18px;
+    z-index: 10;
+}
