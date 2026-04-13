@@ -93,30 +93,40 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
     text-align: left; border-bottom: 1px solid #eee; 
 }
 
-/* On s'assure que le conteneur de la page login centre tout son contenu */
+/* DESIGN DE LA PAGE LOGIN */
 #page-login {
     display: flex;
     flex-direction: column;
-    align-items: center; /* Centre horizontalement */
-    justify-content: center; /* Centre verticalement si besoin */
-    width: 100vw;
-    padding: 0; /* On gère l'espace via les marges des enfants */
+    align-items: center; /* Ceci centre les éléments horizontalement */
+    justify-content: center;
+    padding: 20px;
+    text-align: center;
+    width: 100%; /* S'assure que la page prend toute la largeur */
 }
 
-/* On force les champs et boutons à être bien centrés */
-#page-login input, 
+#page-login input {
+    width: 85%; /* On réduit un peu à 85% pour garantir l'espace à droite */
+    max-width: 300px;
+    padding: 12px;
+    margin: 8px auto; /* Le "auto" centre l'élément, créant l'espace à gauche et à droite */
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    outline: none;
+    display: block; /* Important pour que les marges auto fonctionnent */
+}
+
 #page-login button {
-    width: 85%; /* Un peu moins large pour laisser de l'air à droite */
-    max-width: 350px;
-    margin-left: auto;
-    margin-right: auto;
+    background: #25D366;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 10px auto; /* Centre également le bouton */
+    width: 85%;
+    max-width: 300px;
     display: block;
 }
 
-/* Pour les blocs de champs (login-fields et register-fields) */
-#login-fields, #register-fields {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
+#page-login h2 { color: #075E54; margin-bottom: 5px; }
