@@ -407,5 +407,4 @@ async function checkSession() {
 window.onload = () => {
     checkSession();
 };
-
 checkSession();
