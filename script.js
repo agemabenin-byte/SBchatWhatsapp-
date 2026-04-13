@@ -206,42 +206,5 @@ async function handleLogout() {
     await _supabase.auth.signOut();
     location.reload();
 }
-// --- CHARGER LA LISTE DES MEMBRES ---
-async function loadMembers() {
-    const list = document.getElementById('members-list');
-    list.innerHTML = "<p style='text-align:center;'>Chargement...</p>";
-
-    // On récupère les profils dans Supabase
-    const { data, error } = await _supabase.from('profiles').select('*');
-
-    if (error) {
-        list.innerHTML = "<p style='color:red;'>Erreur de chargement</p>";
-        return;
-    }
-
-    list.innerHTML = ""; // On vide le message de chargement
-    data.forEach(member => {
-        const div = document.createElement('div');
-        div.className = 'member-row';
-        div.innerHTML = `
-            <div>
-                <b>${member.phone}</b><br>
-                <small>${member.email || 'Pas d'email'}</small>
-            </div>
-            <div>
-                <button onclick="openPrivate('${member.id}', '${member.phone}')">✉️</button>
-            </div>
-        `;
-        list.appendChild(div);
-    });
-}
-
-// --- OUVRIR UNE DISCUSSION PRIVÉE ---
-function openPrivate(destId, destPhone) {
-    document.getElementById('dest-display').innerText = destPhone;
-    // On garde l'ID de destination pour l'envoi
-    window.currentDestId = destId; 
-    showView('page-editor');
-}
 
 checkSession();
