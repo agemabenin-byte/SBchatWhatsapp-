@@ -74,7 +74,7 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
 
 /* MENU DÉROULANT */
 .dropdown-content { 
-    display: none; position: absolute; right: 10px; top: 55px; 
+    display: none; position: absolute; right: 15px; top: 65px; 
     background: white; min-width: 180px; box-shadow: 0 8px 16px rgba(0,0,0,0.2); 
     z-index: 100; border-radius: 10px; overflow: hidden; 
 }
