@@ -97,22 +97,20 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
 #page-login {
     display: flex;
     flex-direction: column;
-    align-items: center; /* Ceci centre les éléments horizontalement */
+    align-items: center;
     justify-content: center;
     padding: 20px;
     text-align: center;
-    width: 100%; /* S'assure que la page prend toute la largeur */
 }
 
 #page-login input {
-    width: 85%; /* On réduit un peu à 85% pour garantir l'espace à droite */
+    width: 90%;
     max-width: 300px;
     padding: 12px;
-    margin: 8px auto; /* Le "auto" centre l'élément, créant l'espace à gauche et à droite */
+    margin: 8px 0;
     border-radius: 8px;
     border: 1px solid #ccc;
     outline: none;
-    display: block; /* Important pour que les marges auto fonctionnent */
 }
 
 #page-login button {
@@ -123,10 +121,9 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
     border-radius: 8px;
     font-weight: bold;
     cursor: pointer;
-    margin: 10px auto; /* Centre également le bouton */
-    width: 85%;
+    margin-top: 10px;
+    width: 90%;
     max-width: 300px;
-    display: block;
 }
 
 #page-login h2 { color: #075E54; margin-bottom: 5px; }
