@@ -10,17 +10,28 @@
 </head>
 <body>
 
-    <div id="page-login" class="page">
-        <div class="auth-container">
-            <img src="https://jukfjoljkaoeicopjuwo.supabase.co/storage/v1/object/public/chat-media/1002075620.png" style="width:80px; margin-bottom:10px;">
-            <h2>SuccesBonheur</h2>
-            <p>Connectez-vous pour rejoindre le groupe</p>
-            <input type="tel" id="auth-phone" placeholder="Numéro (ex: 00229...)" required>
-            <input type="email" id="auth-email" placeholder="Email" required>
-            <input type="password" id="auth-password" placeholder="Mot de passe" required>
-            <button onclick="handleAuth()">Se connecter / S'inscrire</button>
-        </div>
+<div id="page-login" class="page">
+    <h2 id="auth-title">Connexion</h2>
+    
+    <div id="login-fields" style="width: 100%;">
+        <input type="email" id="auth-email" placeholder="Email">
+        <input type="password" id="auth-password" placeholder="Mot de passe">
+        <button onclick="handleLoginAction()" style="background: #25D366;">Se Connecter</button>
+        <p style="font-size: 14px; margin-top: 15px;">
+            Pas encore de compte ? <a href="#" onclick="toggleAuthMode(true)" style="color: #075E54; font-weight: bold;">S'inscrire</a>
+        </p>
     </div>
+
+    <div id="register-fields" style="display: none; width: 100%;">
+        <input type="text" id="auth-phone" placeholder="Numéro (ex: 00229...)">
+        <input type="email" id="reg-email" placeholder="Email">
+        <input type="password" id="reg-password" placeholder="Mot de passe">
+        <button onclick="handleRegisterAction()" style="background: #075E54;">S'inscrire</button>
+        <p style="font-size: 14px; margin-top: 15px;">
+            Déjà un compte ? <a href="#" onclick="toggleAuthMode(false)" style="color: #25D366; font-weight: bold;">Se connecter</a>
+        </p>
+    </div>
+</div>
 
     <div id="page-chat" class="page" style="display:none;">
         <div id="groupChoice" style="padding:10px; background:#fff; text-align:center;">
