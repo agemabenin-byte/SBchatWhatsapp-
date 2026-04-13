@@ -207,4 +207,52 @@ async function handleLogout() {
     location.reload();
 }
 
+// --- CHARGER LA LISTE DES MEMBRES ---
+async function loadMembers() {
+    const list = document.getElementById('members-list');
+    list.innerHTML = "<p style='text-align:center;'>Chargement des membres...</p>";
+
+    // Récupération des données depuis Supabase
+    const { data, error } = await _supabase.from('profiles').select('*');
+
+    if (error) {
+        list.innerHTML = "<p style='color:red; text-align:center;'>Erreur de chargement.</p>";
+        console.error(error);
+        return;
+    }
+
+    list.innerHTML = ""; // On vide le message de chargement
+
+    data.forEach(member => {
+        const div = document.createElement('div');
+        div.className = 'member-row';
+        div.style = "background:white; margin:10px; padding:15px; border-radius:12px; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
+        div.innerHTML = `
+            <div>
+                <b style="color:#075E54;">${member.phone}</b><br>
+                <small style="color:gray;">${member.email || 'Pas d'email'}</small>
+            </div>
+            <button onclick="openPrivate('${member.id}', '${member.phone}')" style="background:#25D366; color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer;">✉️</button>
+        `;
+        list.appendChild(div);
+    });
+}
+
+// --- FONCTIONS POUR LE PRIVÉ ---
+function openPrivate(destId, destPhone) {
+    document.getElementById('dest-display').innerText = destPhone;
+    window.currentDestId = destId; 
+    showView('page-editor');
+}
+
+async function executeSendPrivate() {
+    const content = document.getElementById('edit-msg').value;
+    if(!content) return;
+
+    // Ici tu peux ajouter la logique d'envoi à une table "private_messages" si tu l'as créée
+    alert("Message privé envoyé à " + document.getElementById('dest-display').innerText);
+    document.getElementById('edit-msg').value = "";
+    goBack();
+}
+
 checkSession();
