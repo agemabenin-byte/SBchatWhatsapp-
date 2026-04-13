@@ -26,7 +26,15 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
     z-index: 10;
 }
 
-
+/* Positionnement du bouton menu à droite */
+#adminMenuBtn { 
+    position: absolute; 
+    right: 15px; /* Le colle à 15 pixels du bord droit */
+    cursor: pointer; 
+    font-size: 24px; 
+    display: block;
+    padding: 5px; /* Zone de clic plus large */
+}
 
 /* ZONE DES MESSAGES (Prend tout l'espace restant) */
 .messages { 
