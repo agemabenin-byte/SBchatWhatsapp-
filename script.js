@@ -177,4 +177,34 @@ async function compressImg(file) {
     });
 }
 
+// --- CONNEXION / INSCRIPTION ---
+async function handleAuth() {
+    const phone = document.getElementById('auth-phone').value;
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+
+    if(!phone || !email || !password) return alert("Remplissez tout !");
+
+    // Tentative de connexion
+    const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+    
+    if (error) {
+        // Si erreur, on tente l'inscription
+        const { error: regErr } = await _supabase.auth.signUp({ email, password, options: { data: { phone } } });
+        if (regErr) return alert(regErr.message);
+        
+        // Création du profil
+        const { data: user } = await _supabase.auth.getUser();
+        await _supabase.from('profiles').insert([{ id: user.user.id, phone: phone }]);
+        alert("Compte créé ! Vérifiez vos e-mails pour confirmer.");
+    } else {
+        checkSession();
+    }
+}
+
+async function handleLogout() {
+    await _supabase.auth.signOut();
+    location.reload();
+}
+
 checkSession();
