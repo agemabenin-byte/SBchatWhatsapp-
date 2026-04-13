@@ -414,6 +414,5 @@ async function checkSession() {
 window.onload = () => {
     checkSession();
 };
-// On lance la vérification dès que le script est chargé
-checkSession();
+
 
