@@ -126,5 +126,55 @@ function toggleMenu() {
     const d = document.getElementById('adminDropdown');
     d.style.display = (d.style.display === "block") ? "none" : "block";
 }
+// --- CHARGEMENT DU CHAT ---
+async function loadChat() {
+    const { data, error } = await _supabase.from('messages').select('*').order('id', {ascending: true});
+    if (error) console.log(error);
+    const box = document.getElementById('chat-box');
+    box.innerHTML = "";
+    if(data) data.forEach(m => renderMsg(m));
+    box.scrollTop = box.scrollHeight;
+}
+
+function renderMsg(m) {
+    const box = document.getElementById('chat-box');
+    const div = document.createElement('div');
+    div.className = `msg ${m.sender_id === currentUser.id ? 'me' : 'other'}`;
+    
+    div.innerHTML = `
+        <small style="font-weight:bold; color:#075E54;">${m.sender_phone}</small>
+        ${m.image_url ? `<img src="${m.image_url}" class="chat-img">` : ''}
+        <p style="margin:5px 0;">${m.content || ''}</p>
+        <small style="font-size:10px; color:gray; display:block; text-align:right;">${m.time}</small>
+    `;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+}
+
+// --- ÉCOUTE DES NOUVEAUX MESSAGES ---
+function listenRealtime() {
+    _supabase.channel('public:messages').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+        renderMsg(payload.new);
+    }).subscribe();
+}
+
+// --- COMPRESSION PHOTO (INDISPENSABLE) ---
+async function compressImg(file) {
+    return new Promise(res => {
+        const reader = new FileReader(); reader.readAsDataURL(file);
+        reader.onload = e => {
+            const img = new Image(); img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const max = 800; let w = img.width, h = img.height;
+                if(w > max){ h *= max/w; w = max; }
+                canvas.width = w; canvas.height = h;
+                ctx.drawImage(img, 0, 0, w, h);
+                canvas.toBlob(blob => res(blob), 'image/jpeg', 0.7);
+            }
+        }
+    });
+}
 
 checkSession();
