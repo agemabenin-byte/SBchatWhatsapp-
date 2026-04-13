@@ -289,4 +289,22 @@ function togglePass(fieldId, icon) {
     }
 }
 
+async function handleForgotPassword() {
+    const email = document.getElementById('auth-email').value;
+
+    if (!email) {
+        return alert("Veuillez d'abord saisir votre adresse email dans le champ ci-dessus.");
+    }
+
+    const { error } = await _supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin, // Renvoie l'utilisateur sur ton site après le clic
+    });
+
+    if (error) {
+        alert("Erreur : " + error.message);
+    } else {
+        alert("Un e-mail de récupération a été envoyé à " + email + ". Vérifiez votre boîte de réception (et les spams).");
+    }
+}
+
 checkSession();
