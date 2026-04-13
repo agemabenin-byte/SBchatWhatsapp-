@@ -177,28 +177,47 @@ async function compressImg(file) {
     });
 }
 
-// --- CONNEXION / INSCRIPTION ---
-async function handleAuth() {
-    const phone = document.getElementById('auth-phone').value;
+// Fonction pour basculer entre Connexion et Inscription
+function toggleAuthMode(isRegister) {
+    document.getElementById('login-fields').style.display = isRegister ? 'none' : 'block';
+    document.getElementById('register-fields').style.display = isRegister ? 'block' : 'none';
+    document.getElementById('auth-title').innerText = isRegister ? 'S\'inscrire' : 'Connexion';
+}
+
+// Action de CONNEXION pure
+async function handleLoginAction() {
     const email = document.getElementById('auth-email').value;
     const password = document.getElementById('auth-password').value;
 
-    if(!phone || !email || !password) return alert("Remplissez tout !");
+    if(!email || !password) return alert("Veuillez remplir les champs !");
 
-    // Tentative de connexion
-    const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+    const { error } = await _supabase.auth.signInWithPassword({ email, password });
+    if (error) return alert("Erreur : " + error.message);
     
-    if (error) {
-        // Si erreur, on tente l'inscription
-        const { error: regErr } = await _supabase.auth.signUp({ email, password, options: { data: { phone } } });
-        if (regErr) return alert(regErr.message);
-        
-        // Création du profil
-        const { data: user } = await _supabase.auth.getUser();
-        await _supabase.from('profiles').insert([{ id: user.user.id, phone: phone }]);
-        alert("Compte créé ! Vérifiez vos e-mails pour confirmer.");
-    } else {
-        checkSession();
+    checkSession();
+}
+
+// Action d'INSCRIPTION pure
+async function handleRegisterAction() {
+    const phone = document.getElementById('auth-phone').value;
+    const email = document.getElementById('reg-email').value;
+    const password = document.getElementById('reg-password').value;
+
+    if(!phone || !email || !password) return alert("Remplissez tout pour l'inscription !");
+
+    const { data, error } = await _supabase.auth.signUp({ 
+        email, 
+        password, 
+        options: { data: { phone: phone } } 
+    });
+
+    if (error) return alert(error.message);
+
+    // Création du profil dans ta table 'profiles'
+    if(data.user) {
+        await _supabase.from('profiles').insert([{ id: data.user.id, phone: phone }]);
+        alert("Inscription réussie ! Un mail de confirmation vous a été envoyé. Validez-le puis connectez-vous.");
+        toggleAuthMode(false); // On renvoie l'utilisateur vers la page de connexion
     }
 }
 
