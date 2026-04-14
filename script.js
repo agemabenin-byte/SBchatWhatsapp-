@@ -384,30 +384,6 @@ async function handleForgotPassword() {
     else alert("Lien envoyé ! Vérifiez votre boîte mail.");
 }
 
-// --- INITIALISATION ---
-async function checkSession() {
-    console.log("Vérification de la session en cours...");
-    
-    const { data } = await _supabase.auth.getSession();
-    
-    if (data.session) {
-        currentUser = data.session.user;
-        const { data: prof } = await _supabase.from('profiles').select('*').eq('id', currentUser.id).single();
-        
-        if (prof) {
-            currentProfile = prof;
-            document.getElementById('welcomeText').innerText = `Salut ${prof.phone}`;
-            showView('page-chat');
-            loadChat();
-            listenRealtime();
-        } else {
-            showView('page-login');
-        }
-    } else {
-        showView('page-login');
-    }
-}
-
 // 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
 // C'est cette ligne qui empêche le retour forcé au login lors d'un rafraîchissement !
 window.onload = checkSession;
