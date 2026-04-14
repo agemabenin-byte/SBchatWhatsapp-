@@ -343,36 +343,11 @@ async function handleForgotPassword() {
 
 // --- INITIALISATION ---
 async function checkSession() {
-    console.log("Démarrage de la vérification de session...");
-
-    // 1. ÉCOUTEUR D'ÉVÉNEMENTS AUTH (La méthode la plus robuste)
-    _supabase.auth.onAuthStateChange((event, session) => {
-        console.log("Événement Supabase détecté :", event);
-        
-        if (event === "PASSWORD_RECOVERY") {
-            console.log("🚀 ÉVÉNEMENT RECOVERY DÉTECTÉ via onAuthStateChange !");
-            showView('page-reset');
-            return;
-        }
-    });
-
-    // 2. ANALYSE MANUELLE DE L'URL (En secours)
-    const hash = window.location.hash;
-    const urlParams = new URLSearchParams(window.location.search);
+    console.log("Vérification de la session en cours...");
     
-    if (hash.includes("type=recovery") || urlParams.get('type') === 'recovery' || hash.includes("access_token")) {
-        console.log("🚀 PARAMÈTRES RECOVERY DÉTECTÉS dans l'URL !");
-        showView('page-reset');
-        return; // On s'arrête là
-    }
-
-    // 3. VÉRIFICATION DE SESSION CLASSIQUE
     const { data } = await _supabase.auth.getSession();
     
     if (data.session) {
-        // Sécurité : si on vient d'afficher la page reset, on n'envoie pas vers le chat
-        if (document.getElementById('page-reset').style.display === 'flex') return;
-
         currentUser = data.session.user;
         const { data: prof } = await _supabase.from('profiles').select('*').eq('id', currentUser.id).single();
         
@@ -386,14 +361,8 @@ async function checkSession() {
             showView('page-login');
         }
     } else {
-        // Si aucun paramètre de récupération n'est là, on va au login
         showView('page-login');
     }
 }
-
-// Lancement au chargement de la fenêtre
-window.onload = () => {
-    checkSession();
-};
 
 
