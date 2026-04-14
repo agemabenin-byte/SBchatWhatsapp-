@@ -9,25 +9,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
-<div id="page-reset" class="page" style="display:none;">
-    <div class="header">
-        <button onclick="showView('page-login')" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
-        <b>Nouveau mot de passe</b>
-    </div>
-    
-    <div class="auth-container" style="width: 100%; margin-top: 50px; display: flex; flex-direction: column; align-items: center;">
-        <p style="text-align:center; padding: 0 20px;">Choisissez votre nouveau mot de passe ci-dessous.</p>
-        
-        <div class="password-container" style="width: 85%; max-width: 350px;">
-            <input type="password" id="new-password-input" placeholder="Nouveau mot de passe" style="width: 100%;">
-            <span class="toggle-password" onclick="togglePass('new-password-input', this)">👁️</span>
-        </div>
-        
-        <button onclick="handleUpdatePassword()" style="background: #075E54; width: 85%; max-width: 350px; margin-top: 20px;">
-            Mettre à jour le mot de passe
-        </button>
-    </div>
-</div>
     
 <div id="page-login" class="page">
     <h2 id="auth-title">Connexion</h2>
