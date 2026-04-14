@@ -4,26 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Réinitialisation - SuccesBonheur</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="reset.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5;">
+<body>
 
-    <div class="page" style="display: flex; flex-direction: column; width: 90%; max-width: 400px; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
-        <h2 style="text-align: center; color: #075E54;">Nouveau mot de passe</h2>
-        <p style="font-size: 14px; text-align: center; margin-bottom: 20px;">Saisissez votre nouveau mot de passe ci-dessous.</p>
+    <div class="reset-container">
+        <div class="header-reset">
+            SuccesBonheur Pro
+        </div>
         
-        <input type="password" id="new-password" placeholder="Minimum 6 caractères" style="padding: 12px; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 15px;">
-        
-        <button onclick="updateNow()" id="btnUpdate" style="background: #25D366; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;">
-            Mettre à jour
-        </button>
-        
-        <p id="status-msg" style="display:none; margin-top: 15px; text-align: center; font-size: 13px;"></p>
+        <div class="form-body">
+            <p>Sécurité de votre compte :<br>Veuillez choisir un nouveau mot de passe robuste.</p>
+            
+            <input type="password" id="new-password" placeholder="Nouveau mot de passe">
+            
+            <button onclick="updateNow()" id="btnUpdate">
+                MODIFIER LE MOT DE PASSE
+            </button>
+            
+            <div id="status-msg"></div>
+        </div>
     </div>
 
     <script>
-        // Initialisation de Supabase (Utilise tes clés ici)
         const SUPABASE_URL = 'https://jukfjoljkaoeicopjuwo.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_zvBTaDrffaATEPI7Wbu4OQ_w8ZR6chX';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -39,23 +43,21 @@
             }
 
             btn.disabled = true;
-            btn.innerText = "Mise à jour...";
+            btn.innerText = "Traitement en cours...";
 
             const { error } = await _supabase.auth.updateUser({ password: newPassword });
 
             if (error) {
-                msg.style.display = "block";
-                msg.style.color = "red";
-                msg.innerText = "Erreur : " + error.message;
+                msg.style.color = "#d32f2f";
+                msg.innerText = "❌ Erreur : " + error.message;
                 btn.disabled = false;
-                btn.innerText = "Mettre à jour";
+                btn.innerText = "RÉESSAYER";
             } else {
-                msg.style.display = "block";
-                msg.style.color = "green";
-                msg.innerText = "Succès ! Redirection vers la connexion...";
+                msg.style.color = "#2e7d32";
+                msg.innerText = "✅ Succès ! Redirection vers la connexion...";
                 setTimeout(() => {
                     window.location.href = "index.html";
-                }, 2000);
+                }, 2500);
             }
         }
     </script>
