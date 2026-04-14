@@ -75,18 +75,24 @@ async function handleSend() {
     if(currentProfile.is_banned) return alert("Banni !");
     
     const input = document.getElementById('msgInput');
-    const content = input.value.trim(); // .trim() évite les messages vides pleins d'espaces
+    const sendBtn = document.querySelector('.send-btn'); // On cible ton bouton d'envoi
+    const content = input.value.trim();
     const fileInput = document.getElementById('file-input');
     const file = fileInput.files[0];
     let url = null;
 
-    // 1. GESTION DE L'IMAGE
+    // 1. SÉCURITÉ : ON N'ENVOIE PAS SI TOUT EST VIDE
+    if(!content && !file) return;
+
+    // Désactiver le bouton pendant l'envoi pour éviter les doubles clics
+    if(sendBtn) sendBtn.disabled = true;
+
+    // 2. GESTION DE L'IMAGE (Si présente, elle part avec le texte)
     if(file) {
         try {
             const name = `${Date.now()}.jpg`;
             const blob = await compressImg(file);
             
-            // On force le contentType pour que le navigateur sache que c'est une photo
             const { data: uploadData, error: uploadError } = await _supabase.storage
                 .from('chat-media')
                 .upload(name, blob, {
@@ -97,20 +103,17 @@ async function handleSend() {
 
             if (uploadError) throw uploadError;
 
-            // Récupération sécurisée de l'URL publique
             const { data: urlData } = _supabase.storage.from('chat-media').getPublicUrl(name);
             url = urlData.publicUrl;
             
         } catch (err) {
             console.error("Erreur Storage:", err.message);
-            return alert("Impossible d'envoyer l'image. Vérifiez votre connexion.");
+            if(sendBtn) sendBtn.disabled = false;
+            return alert("Impossible d'envoyer l'image. Réessayez.");
         }
     }
 
-    // 2. SÉCURITÉ : ON N'ENVOIE PAS SI TOUT EST VIDE
-    if(!content && !url) return;
-
-    // 3. ENVOI DU MESSAGE DANS LA TABLE
+    // 3. ENVOI DU MESSAGE (Contenu + Image + Reply)
     const { error: insertError } = await _supabase.from('messages').insert([{
         sender_id: currentUser.id, 
         sender_phone: currentProfile.phone,
@@ -124,16 +127,18 @@ async function handleSend() {
         console.error("Erreur Database:", insertError.message);
         alert("Erreur lors de l'envoi du message.");
     } else {
-        // 4. NETTOYAGE SI TOUT A MARCHÉ
+        // 4. NETTOYAGE AUTOMATIQUE
         input.value = ""; 
         input.style.height = 'auto';
-        fileInput.value = "";
+        fileInput.value = ""; // Vide l'input fichier pour le prochain envoi
         cancelReply();
         
-        // Petit scroll automatique vers le bas pour voir son propre message
         const box = document.getElementById('chat-box');
         box.scrollTop = box.scrollHeight;
     }
+
+    // Réactiver le bouton après l'envoi
+    if(sendBtn) sendBtn.disabled = false;
 }
 
 // --- RÉPONDRE (GLISSER/CLIC) (Point 11) ---
