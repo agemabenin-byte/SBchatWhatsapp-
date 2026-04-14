@@ -66,8 +66,9 @@ function autoResize(el) {
 // --- ENVOI PHOTO AVEC LÉGENDE (Point 10) ---
 async function handleFileSelect() {
     const file = document.getElementById('file-input').files[0];
-    if(file && confirm("Envoyer cette image avec votre texte ?")) {
-        handleSend(); 
+    if (file) {
+        // On lance l'envoi directement, sans poser de question
+        await handleSend();
     }
 }
 
