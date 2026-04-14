@@ -24,6 +24,9 @@ function goBack() {
     }
 }
 
+// À mettre à la toute fin de script.js
+window.onload = checkSession;
+
 // Intercepter bouton retour téléphone
 window.addEventListener('popstate', (e) => {
     if(viewHistory.length > 1) {
