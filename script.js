@@ -75,25 +75,21 @@ async function handleSend() {
     if(currentProfile.is_banned) return alert("Banni !");
     
     const input = document.getElementById('msgInput');
-    const sendBtn = document.querySelector('.send-btn'); // On cible ton bouton d'envoi
-    const content = input.value.trim();
     const fileInput = document.getElementById('file-input');
+    const content = input.value.trim();
     const file = fileInput.files[0];
     let url = null;
 
-    // 1. SÉCURITÉ : ON N'ENVOIE PAS SI TOUT EST VIDE
+    // Si rien n'est écrit et aucune image n'est choisie, on sort
     if(!content && !file) return;
 
-    // Désactiver le bouton pendant l'envoi pour éviter les doubles clics
-    if(sendBtn) sendBtn.disabled = true;
-
-    // 2. GESTION DE L'IMAGE (Si présente, elle part avec le texte)
+    // GESTION DE L'IMAGE
     if(file) {
         try {
             const name = `${Date.now()}.jpg`;
             const blob = await compressImg(file);
             
-            const { data: uploadData, error: uploadError } = await _supabase.storage
+            const { error: uploadError } = await _supabase.storage
                 .from('chat-media')
                 .upload(name, blob, {
                     contentType: 'image/jpeg',
@@ -105,16 +101,14 @@ async function handleSend() {
 
             const { data: urlData } = _supabase.storage.from('chat-media').getPublicUrl(name);
             url = urlData.publicUrl;
-            
         } catch (err) {
             console.error("Erreur Storage:", err.message);
-            if(sendBtn) sendBtn.disabled = false;
-            return alert("Impossible d'envoyer l'image. Réessayez.");
+            return; // On arrête silencieusement en cas d'erreur
         }
     }
 
-    // 3. ENVOI DU MESSAGE (Contenu + Image + Reply)
-    const { error: insertError } = await _supabase.from('messages').insert([{
+    // ENVOI DANS LA TABLE MESSAGES
+    await _supabase.from('messages').insert([{
         sender_id: currentUser.id, 
         sender_phone: currentProfile.phone,
         content: content, 
@@ -123,22 +117,14 @@ async function handleSend() {
         time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
     }]);
 
-    if(insertError) {
-        console.error("Erreur Database:", insertError.message);
-        alert("Erreur lors de l'envoi du message.");
-    } else {
-        // 4. NETTOYAGE AUTOMATIQUE
-        input.value = ""; 
-        input.style.height = 'auto';
-        fileInput.value = ""; // Vide l'input fichier pour le prochain envoi
-        cancelReply();
-        
-        const box = document.getElementById('chat-box');
-        box.scrollTop = box.scrollHeight;
-    }
-
-    // Réactiver le bouton après l'envoi
-    if(sendBtn) sendBtn.disabled = false;
+    // NETTOYAGE IMMÉDIAT
+    input.value = ""; 
+    fileInput.value = ""; // Très important pour pouvoir renvoyer la même image plus tard
+    input.style.height = 'auto';
+    cancelReply();
+    
+    const box = document.getElementById('chat-box');
+    box.scrollTop = box.scrollHeight;
 }
 
 // --- RÉPONDRE (GLISSER/CLIC) (Point 11) ---
