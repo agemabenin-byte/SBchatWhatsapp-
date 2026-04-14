@@ -24,8 +24,6 @@ function goBack() {
     }
 }
 
-// À mettre à la toute fin de script.js
-window.onload = checkSession;
 
 // Intercepter bouton retour téléphone
 window.addEventListener('popstate', (e) => {
@@ -38,28 +36,40 @@ window.addEventListener('popstate', (e) => {
 history.pushState(null, null, window.location.pathname);
 
 // --- INITIALISATION ---
+// 1. LA FONCTION CHECK SESSION CORRIGÉE
 async function checkSession() {
     const { data } = await _supabase.auth.getSession();
-    if (data.session) {
+    
+    if (data && data.session) {
         currentUser = data.session.user;
+        
+        // On récupère le profil pour avoir le numéro de téléphone
         const { data: prof } = await _supabase.from('profiles').select('*').eq('id', currentUser.id).single();
-        currentProfile = prof;
-        document.getElementById('welcomeText').innerText = `Salut ${prof.phone}`; // Point 7
-        showView('page-chat');
-        loadChat();
-        listenRealtime();
+        
+        if (prof) {
+            currentProfile = prof;
+            document.getElementById('welcomeText').innerText = `Salut ${prof.phone}`;
+            showView('page-chat');
+            loadChat();
+            listenRealtime();
+        } else {
+            // Si la session existe mais pas le profil, on renvoie au login
+            showView('page-login');
+        }
     } else {
+        // Pas de session, direction login
         showView('page-login');
     }
 }
 
-// --- RETOUR À LA LIGNE (Point 6) ---
+// 2. L'ÉCOUTEUR DE TOUCHE ENTRÉE (Déjà bon dans ton code)
 document.getElementById('msgInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSend();
     }
 });
+
 
 function autoResize(el) {
     el.style.height = 'auto';
@@ -397,5 +407,9 @@ async function checkSession() {
         showView('page-login');
     }
 }
+
+// 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
+// C'est cette ligne qui empêche le retour forcé au login lors d'un rafraîchissement !
+window.onload = checkSession;
 
 
