@@ -323,41 +323,22 @@ function togglePass(fieldId, icon) {
 
 async function handleForgotPassword() {
     let input = document.getElementById('auth-email').value.trim();
-
-    if (!input) {
-        return alert("Veuillez saisir votre numéro ou votre email.");
-    }
+    if (!input) return alert("Veuillez saisir votre numéro ou votre email.");
 
     let emailToSend = input;
-
-    // Si l'entrée ne contient pas de "@", on considère que c'est un numéro
     if (!input.includes("@")) {
-        console.log("Recherche de l'email associé au numéro :", input);
-        
-        // On cherche dans la table 'profiles' le mail correspondant au numéro
-        const { data, error } = await _supabase
-            .from('profiles')
-            .select('email') // Assure-toi que ta table profiles a une colonne email
-            .eq('phone', input)
-            .single();
-
-        if (error || !data) {
-            return alert("Aucun compte trouvé avec ce numéro. Vérifiez votre saisie.");
-        }
-        
+        const { data } = await _supabase.from('profiles').select('email').eq('phone', input).single();
+        if (!data) return alert("Numéro inconnu.");
         emailToSend = data.email;
     }
 
-    // Envoi du mail de récupération via Supabase
-    const { error: resetError } = await _supabase.auth.resetPasswordForEmail(emailToSend, {
-        redirectTo: window.location.origin,
+    // ON DÉFINIT ICI L'URL DE REDIRECTION VERS TON NOUVEAU FICHIER
+    const { error } = await _supabase.auth.resetPasswordForEmail(emailToSend, {
+        redirectTo: 'https://sbchatmessage.netlify.app/reset.html', 
     });
 
-    if (resetError) {
-        alert("Erreur : " + resetError.message);
-    } else {
-        alert("Succès ! Un lien de récupération a été envoyé à l'adresse associée : " + emailToSend);
-    }
+    if (error) alert("Erreur : " + error.message);
+    else alert("Lien envoyé ! Vérifiez votre boîte mail.");
 }
 
 async function handleUpdatePassword() {
