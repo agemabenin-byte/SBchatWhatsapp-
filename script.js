@@ -5,12 +5,11 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const ADMINS_PHONES = ["002290140804495", "002290140804494", "002290196479181", "002290167648919", "002290195618690"];
 let currentUser = null, currentProfile = null, replyToId = null, viewHistory = ['page-login'];
 
-// --- NAVIGATION & RETOUR ANDROID ---
+// --- NAVIGATION ---
 function showView(viewId) {
-    const target = document.getElementById(viewId);
-    if (!target) return;
     document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-    target.style.display = 'flex';
+    const target = document.getElementById(viewId);
+    if(target) target.style.display = 'flex';
     if(viewId !== viewHistory[viewHistory.length - 1]) viewHistory.push(viewId);
     
     if(viewId === 'page-members') loadMembers();
@@ -26,16 +25,7 @@ function goBack() {
     }
 }
 
-window.addEventListener('popstate', (e) => {
-    if(viewHistory.length > 1) {
-        e.preventDefault();
-        goBack();
-        history.pushState(null, null, window.location.pathname);
-    }
-});
-history.pushState(null, null, window.location.pathname);
-
-// --- INITIALISATION ---
+// --- SESSION ---
 async function checkSession() {
     const { data } = await _supabase.auth.getSession();
     if (data && data.session) {
@@ -51,7 +41,7 @@ async function checkSession() {
     } else { showView('page-login'); }
 }
 
-// --- GESTION MESSAGES (AVEC CLOUDINARY) ---
+// --- CHAT ET CLOUDINARY ---
 async function handleFileSelect() {
     const file = document.getElementById('file-input').files[0];
     if (file) await handleSend();
@@ -59,7 +49,6 @@ async function handleFileSelect() {
 
 async function handleSend() {
     if(currentProfile && currentProfile.is_banned) return alert("Banni !");
-    
     const input = document.getElementById('msgInput');
     const fileInput = document.getElementById('file-input');
     const content = input.value.trim();
@@ -70,43 +59,82 @@ async function handleSend() {
 
     if(file) {
         try {
-            const cloudName = "dtkssnhub"; 
-            const uploadPreset = "chat_preset"; 
-
             const formData = new FormData();
             formData.append('file', file);
-            formData.append('upload_preset', uploadPreset);
-
-            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-                method: 'POST',
-                body: formData
+            formData.append('upload_preset', "chat_preset");
+            const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
+                method: 'POST', body: formData
             });
-
             const data = await response.json();
-            if(data.secure_url) {
-                url = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
-            }
-        } catch (err) {
-            console.error("Erreur Cloudinary:", err);
-            return alert("Erreur d'envoi de l'image.");
-        }
+            if(data.secure_url) url = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+        } catch (err) { return alert("Erreur envoi image Cloudinary."); }
     }
 
     await _supabase.from('messages').insert([{
-        sender_id: currentUser.id, 
-        sender_phone: currentProfile.phone,
-        content: content, 
-        image_url: url, 
-        reply_to_id: replyToId,
+        sender_id: currentUser.id, sender_phone: currentProfile.phone,
+        content: content, image_url: url, reply_to_id: replyToId,
         time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
     }]);
 
-    input.value = ""; 
-    fileInput.value = ""; 
-    input.style.height = 'auto';
-    cancelReply();
-    const box = document.getElementById('chat-box');
-    box.scrollTop = box.scrollHeight;
+    input.value = ""; fileInput.value = ""; cancelReply();
+}
+
+// --- MEMBRES ET PRIVÉ (INBOX) ---
+async function loadMembers() {
+    const list = document.getElementById('members-list');
+    list.innerHTML = "Chargement...";
+    const { data } = await _supabase.from('profiles').select('*');
+    list.innerHTML = "";
+    data.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'member-row';
+        div.style = "background:white; margin:10px; padding:15px; border-radius:12px; display:flex; justify-content:space-between;";
+        div.innerHTML = `<div><b>${m.phone}</b><br><small>${m.email || ''}</small></div>
+                         <button onclick="openPrivate('${m.id}', '${m.phone}')" style="background:#25D366; color:white; border:none; padding:8px; border-radius:5px;">✉️</button>`;
+        list.appendChild(div);
+    });
+}
+
+function openPrivate(destId, destPhone) {
+    document.getElementById('dest-display').innerText = destPhone;
+    window.currentDestId = destId;
+    showView('page-editor');
+}
+
+async function executeSendPrivate() {
+    const content = document.getElementById('edit-msg').value;
+    if(!content) return;
+    const { error } = await _supabase.from('inbox').insert([{
+        from_id: currentUser.id, to_id: window.currentDestId,
+        content: content, sender_phone: currentProfile.phone,
+        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+    }]);
+    if(!error) { alert("Envoyé !"); goBack(); }
+}
+
+async function loadInbox() {
+    const box = document.getElementById('inbox-list');
+    const { data } = await _supabase.from('inbox').select('*').eq('to_id', currentUser.id).order('id', {ascending: false});
+    box.innerHTML = data.length ? "" : "Aucun message.";
+    data.forEach(msg => {
+        const div = document.createElement('div');
+        div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366;";
+        div.innerHTML = `<b>De: ${msg.sender_phone}</b><p>${msg.content}</p><small>${msg.time}</small>`;
+        box.appendChild(div);
+    });
+}
+
+// --- DIFFUSION (BROADCAST) ---
+async function executeBroadcast() {
+    const content = document.getElementById('broadcast-msg').value;
+    if(!content) return;
+    // Ici on envoie dans le chat général au nom de l'admin
+    await _supabase.from('messages').insert([{
+        sender_id: currentUser.id, sender_phone: "ADMIN 📢",
+        content: content, time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+    }]);
+    alert("Message diffusé !");
+    goBack();
 }
 
 // --- AUTHENTIFICATION ---
@@ -119,62 +147,44 @@ function toggleAuthMode(isRegister) {
 async function handleLoginAction() {
     let input = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
-    if(!input || !password) return alert("Remplissez tout !");
-
     let loginEmail = input;
     if (!input.includes("@")) {
         const { data } = await _supabase.from('profiles').select('email').eq('phone', input).single();
         if (!data) return alert("Numéro inconnu.");
         loginEmail = data.email;
     }
-
-    const { error } = await _supabase.auth.signInWithPassword({ email: loginEmail, password: password });
-    if (error) return alert("Erreur : " + error.message);
-    checkSession();
+    const { error } = await _supabase.auth.signInWithPassword({ email: loginEmail, password });
+    if (error) alert(error.message); else checkSession();
 }
 
 async function handleRegisterAction() {
     const phone = document.getElementById('auth-phone').value.trim();
     const email = document.getElementById('reg-email').value.trim();
     const password = document.getElementById('reg-password').value;
-    if(!phone || !email || !password) return alert("Tout remplir !");
-
-    const { data, error } = await _supabase.auth.signUp({ email, password, options: { data: { phone: phone } } });
+    const { data, error } = await _supabase.auth.signUp({ email, password });
     if (error) return alert(error.message);
-
     if(data.user) {
-        await _supabase.from('profiles').insert([{ id: data.user.id, phone: phone, email: email }]);
-        alert("Inscription réussie ! Validez votre email.");
-        toggleAuthMode(false); 
+        await _supabase.from('profiles').insert([{ id: data.user.id, phone, email }]);
+        alert("Inscrit ! Vérifiez vos mails.");
+        toggleAuthMode(false);
     }
 }
 
-// --- FONCTIONS SECONDAIRES (MENU, EXPORT, ETC) ---
+// --- TOOLS ---
 function toggleMenu() {
     const d = document.getElementById('adminDropdown');
     d.style.display = (d.style.display === "block") ? "none" : "block";
 }
-
-async function exporterContacts() {
-    const {data} = await _supabase.from('profiles').select('phone, email');
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Membres");
-    XLSX.writeFile(wb, "Membres_SuccesBonheur.xlsx");
+function autoResize(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+function togglePass(id, icon) {
+    const f = document.getElementById(id);
+    f.type = f.type === "password" ? "text" : "password";
+    icon.innerText = f.type === "password" ? "👁️" : "🔒";
 }
+function cancelReply() { replyToId = null; document.getElementById('reply-preview').style.display = 'none'; }
+async function handleLogout() { await _supabase.auth.signOut(); location.reload(); }
 
-function togglePass(fieldId, icon) {
-    const field = document.getElementById(fieldId);
-    field.type = (field.type === "password") ? "text" : "password";
-    icon.innerText = (field.type === "password") ? "👁️" : "🔒";
-}
-
-async function handleLogout() {
-    await _supabase.auth.signOut();
-    location.reload();
-}
-
-// --- LOGIQUE CHAT ---
+// --- RENDER & REALTIME ---
 async function loadChat() {
     const { data } = await _supabase.from('messages').select('*').order('id', {ascending: true});
     const box = document.getElementById('chat-box');
@@ -187,30 +197,16 @@ function renderMsg(m) {
     const box = document.getElementById('chat-box');
     const div = document.createElement('div');
     div.className = `msg ${m.sender_id === currentUser.id ? 'me' : 'other'}`;
-    div.innerHTML = `
-        <small style="font-weight:bold; color:#075E54;">${m.sender_phone}</small>
-        ${m.image_url ? `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px;">` : ''}
-        <p style="margin:5px 0;">${m.content || ''}</p>
-        <small style="font-size:10px; color:gray; display:block; text-align:right;">${m.time}</small>
-    `;
+    div.innerHTML = `<small><b>${m.sender_phone}</b></small>
+                     ${m.image_url ? `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:10px;">` : ''}
+                     <p>${m.content || ''}</p>
+                     <small style="font-size:10px; text-align:right; display:block;">${m.time}</small>`;
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
 }
 
 function listenRealtime() {
-    _supabase.channel('public:messages').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-        renderMsg(payload.new);
-    }).subscribe();
+    _supabase.channel('public:messages').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, p => renderMsg(p.new)).subscribe();
 }
 
-function cancelReply() { replyToId = null; document.getElementById('reply-preview').style.display = 'none'; }
-
-// --- INITIALISATION FINALE ---
 window.onload = checkSession;
-
-document.getElementById('msgInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-    }
-});
