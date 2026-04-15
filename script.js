@@ -5,13 +5,16 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const ADMINS_PHONES = ["002290140804495", "002290140804494", "002290196479181", "002290167648919", "002290195618690"];
 let currentUser = null, currentProfile = null, replyToId = null, viewHistory = ['page-login'];
 
-
-// --- NAVIGATION ---
+// --- NAVIGATION (CORRIGÉE) ---
 function showView(viewId) {
     document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
     const target = document.getElementById(viewId);
     if(target) target.style.display = 'flex';
-    if(viewId !== viewHistory[viewHistory.length - 1]) viewHistory.push(viewId);
+
+    // AJOUTE CETTE LIGNE : Elle enregistre la page dans l'historique
+    if(viewId !== viewHistory[viewHistory.length - 1]) {
+        viewHistory.push(viewId);
+    }
     
     if(viewId === 'page-members') loadMembers();
     if(viewId === 'page-inbox') loadInbox();
