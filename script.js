@@ -74,6 +74,15 @@ async function handleSend() {
     input.value = ""; fileInput.value = ""; cancelReply();
 }
 
+function goBack() {
+    if(viewHistory.length > 1) {
+        viewHistory.pop();
+        const prev = viewHistory[viewHistory.length - 1];
+        document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+        document.getElementById(prev).style.display = 'flex';
+    }
+}
+
 // --- EXCEL (RÉPARÉ) ---
 async function exporterContacts() {
     try {
