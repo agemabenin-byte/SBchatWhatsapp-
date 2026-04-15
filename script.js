@@ -7,17 +7,35 @@ let currentUser = null, currentProfile = null, replyToId = null, viewHistory = [
 
 // --- NAVIGATION (CORRIGÉE) ---
 function showView(viewId) {
-    document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-    const target = document.getElementById(viewId);
-    if(target) target.style.display = 'flex';
+    console.log("Navigation vers :", viewId); // Pour vérifier dans la console (F12)
 
-    // AJOUTE CETTE LIGNE : Elle enregistre la page dans l'historique
-    if(viewId !== viewHistory[viewHistory.length - 1]) {
-        viewHistory.push(viewId);
+    // 1. Cacher toutes les pages
+    const pages = document.querySelectorAll('.page');
+    pages.forEach(p => p.style.display = 'none');
+
+    // 2. Afficher la cible
+    const target = document.getElementById(viewId);
+    if (target) {
+        target.style.display = 'flex';
+    } else {
+        console.error("La page n'existe pas :", viewId);
+        return;
     }
-    
-    if(viewId === 'page-members') loadMembers();
-    if(viewId === 'page-inbox') loadInbox();
+
+    // 3. Gestion de l'historique (Sécurisée)
+    // On vérifie si viewHistory existe, sinon on le crée
+    if (typeof viewHistory === 'undefined') {
+        window.viewHistory = [viewId];
+    } else {
+        // On ajoute la page seulement si elle est différente de la dernière
+        if (viewId !== viewHistory[viewHistory.length - 1]) {
+            viewHistory.push(viewId);
+        }
+    }
+
+    // 4. Chargements spécifiques
+    if (viewId === 'page-members') loadMembers();
+    if (viewId === 'page-inbox') loadInbox();
 }
 
 // --- SESSION ---
