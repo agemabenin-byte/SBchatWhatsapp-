@@ -6,31 +6,20 @@ const ADMINS_PHONES = ["002290140804495", "002290140804494", "002290196479181", 
 let currentUser = null, currentProfile = null, replyToId = null, viewHistory = ['page-login'];
 
 // --- NAVIGATION (CORRIGÉE) ---
-function showView(viewId) {
-    console.log("Navigation vers :", viewId); // Pour vérifier dans la console (F12)
-
+function showView(viewId, isBack = false) {
     // 1. Cacher toutes les pages
-    const pages = document.querySelectorAll('.page');
-    pages.forEach(p => p.style.display = 'none');
-
+    document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+    
     // 2. Afficher la cible
     const target = document.getElementById(viewId);
     if (target) {
         target.style.display = 'flex';
-    } else {
-        console.error("La page n'existe pas :", viewId);
-        return;
     }
 
-    // 3. Gestion de l'historique (Sécurisée)
-    // On vérifie si viewHistory existe, sinon on le crée
-    if (typeof viewHistory === 'undefined') {
-        window.viewHistory = [viewId];
-    } else {
-        // On ajoute la page seulement si elle est différente de la dernière
-        if (viewId !== viewHistory[viewHistory.length - 1]) {
-            viewHistory.push(viewId);
-        }
+    // 3. Gestion de l'historique du navigateur
+    if (!isBack) {
+        // On ajoute l'état dans l'historique du navigateur
+        history.pushState({ viewId: viewId }, "", "");
     }
 
     // 4. Chargements spécifiques
@@ -95,14 +84,21 @@ async function handleSend() {
     input.value = ""; fileInput.value = ""; cancelReply();
 }
 
+// Cette fonction gère tes boutons "Retour" (la flèche ⬅ dans ton HTML)
 function goBack() {
-    if(viewHistory.length > 1) {
-        viewHistory.pop();
-        const prev = viewHistory[viewHistory.length - 1];
-        document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-        document.getElementById(prev).style.display = 'flex';
-    }
+    window.history.back(); // Cela va déclencher l'événement 'popstate' juste en dessous
 }
+
+// Cet écouteur surveille le bouton "Retour" du téléphone et du navigateur
+window.onpopstate = function(event) {
+    if (event.state && event.state.viewId) {
+        // Si on a un historique, on affiche la page précédente sans ajouter de nouvel état
+        showView(event.state.viewId, true);
+    } else {
+        // Si on revient au tout début, on affiche le login ou le chat
+        showView('page-login', true);
+    }
+};
 
 // --- EXCEL (RÉPARÉ) ---
 async function exporterContacts() {
