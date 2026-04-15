@@ -152,3 +152,17 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
     font-size: 18px;
     z-index: 10;
 }
+
+
+.auth-logo {
+    width: 140px;          /* Taille idéale pour mobile */
+    height: auto;
+    display: block;
+    margin: 0 auto 15px;  /* 0 auto pour centrer, 15px d'espace avec le titre */
+    filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.1)); /* Optionnel : ajoute une légère ombre douce */
+}
+
+.auth-container {
+    padding: 20px;
+    text-align: center;
+}
