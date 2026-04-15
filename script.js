@@ -197,20 +197,38 @@ async function loadMembers() {
     });
 }
 
-// --- AUTH & UI ---
+// Action de CONNEXION pure
 async function handleLoginAction() {
     let input = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
+
+    if(!input || !password) return alert("Veuillez remplir tous les champs !");
+
     let loginEmail = input;
+
+    // Si c'est un numéro, on récupère le mail pour Supabase
     if (!input.includes("@")) {
-        const { data } = await _supabase.from('profiles').select('email').eq('phone', input).single();
+        const { data } = await _supabase
+            .from('profiles')
+            .select('email')
+            .eq('phone', input)
+            .single();
+        
         if (!data) return alert("Numéro inconnu.");
         loginEmail = data.email;
     }
-    const { error } = await _supabase.auth.signInWithPassword({ email: loginEmail, password: password });
-    if (error) return alert(error.message);
+
+    const { error } = await _supabase.auth.signInWithPassword({ 
+        email: loginEmail, 
+        password: password 
+    });
+
+    if (error) return alert("Connexion échouée : " + error.message);
+    
     checkSession();
 }
+
+
 
 async function handleRegisterAction() {
     const phone = document.getElementById('auth-phone').value.trim();
