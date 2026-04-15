@@ -1,92 +1,50 @@
 const SUPABASE_URL = 'https://jukfjoljkaoeicopjuwo.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_zvBTaDrffaATEPI7Wbu4OQ_w8ZR6chX'; // Remets TA clé ici
+const SUPABASE_KEY = 'sb_publishable_zvBTaDrffaATEPI7Wbu4OQ_w8ZR6chX'; 
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const ADMINS_PHONES = ["002290140804495", "002290140804494", "002290196479181", "002290167648919", "002290195618690"];
 let currentUser = null, currentProfile = null, replyToId = null, viewHistory = ['page-login'];
 
-// --- NAVIGATION & RETOUR ANDROID (Point 5) ---
+// --- NAVIGATION ---
 function showView(viewId) {
     document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-    document.getElementById(viewId).style.display = 'flex';
+    const targetPage = document.getElementById(viewId);
+    if (targetPage) targetPage.style.display = 'flex';
     if(viewId !== viewHistory[viewHistory.length - 1]) viewHistory.push(viewId);
-    
     if(viewId === 'page-members') loadMembers();
-    if(viewId === 'page-inbox') loadInbox();
 }
 
 function goBack() {
     if(viewHistory.length > 1) {
         viewHistory.pop();
-        const prev = viewHistory[viewHistory.length - 1];
-        document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-        document.getElementById(prev).style.display = 'flex';
+        showView(viewHistory[viewHistory.length - 1]);
     }
 }
 
-
-// Intercepter bouton retour téléphone
-window.addEventListener('popstate', (e) => {
-    if(viewHistory.length > 1) {
-        e.preventDefault();
-        goBack();
-        history.pushState(null, null, window.location.pathname);
-    }
-});
-history.pushState(null, null, window.location.pathname);
-
-// --- INITIALISATION ---
-// 1. LA FONCTION CHECK SESSION CORRIGÉE
+// --- SESSION & AUTH ---
 async function checkSession() {
     const { data } = await _supabase.auth.getSession();
-    
     if (data && data.session) {
         currentUser = data.session.user;
-        
-        // On récupère le profil pour avoir le numéro de téléphone
         const { data: prof } = await _supabase.from('profiles').select('*').eq('id', currentUser.id).single();
-        
         if (prof) {
             currentProfile = prof;
             document.getElementById('welcomeText').innerText = `Salut ${prof.phone}`;
             showView('page-chat');
             loadChat();
             listenRealtime();
-        } else {
-            // Si la session existe mais pas le profil, on renvoie au login
-            showView('page-login');
-        }
-    } else {
-        // Pas de session, direction login
-        showView('page-login');
-    }
+        } else { showView('page-login'); }
+    } else { showView('page-login'); }
 }
 
-// 2. L'ÉCOUTEUR DE TOUCHE ENTRÉE (Déjà bon dans ton code)
-document.getElementById('msgInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-    }
-});
-
-
-function autoResize(el) {
-    el.style.height = 'auto';
-    el.style.height = el.scrollHeight + 'px';
-}
-
-// --- ENVOI PHOTO AVEC LÉGENDE (Point 10) ---
+// --- GESTION DES MESSAGES ET CLOUDINARY ---
 async function handleFileSelect() {
     const file = document.getElementById('file-input').files[0];
-    if (file) {
-        // On lance l'envoi directement, sans poser de question
-        await handleSend();
-    }
+    if (file) await handleSend(); // Envoi automatique immédiat
 }
 
 async function handleSend() {
-    if(currentProfile.is_banned) return alert("Banni !");
+    if(currentProfile && currentProfile.is_banned) return alert("Banni !");
     
     const input = document.getElementById('msgInput');
     const fileInput = document.getElementById('file-input');
@@ -94,34 +52,35 @@ async function handleSend() {
     const file = fileInput.files[0];
     let url = null;
 
-    // Si rien n'est écrit et aucune image n'est choisie, on sort
     if(!content && !file) return;
 
-    // GESTION DE L'IMAGE
+    // --- UPLOAD VERS CLOUDINARY ---
     if(file) {
         try {
-            const name = `${Date.now()}.jpg`;
-            const blob = await compressImg(file);
-            
-            const { error: uploadError } = await _supabase.storage
-                .from('chat-media')
-                .upload(name, blob, {
-                    contentType: 'image/jpeg',
-                    cacheControl: '3600',
-                    upsert: false
-                });
+            const cloudName = "dtkssnhub"; 
+            const uploadPreset = "chat_preset"; 
 
-            if (uploadError) throw uploadError;
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', uploadPreset);
 
-            const { data: urlData } = _supabase.storage.from('chat-media').getPublicUrl(name);
-            url = urlData.publicUrl;
+            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            if(data.secure_url) {
+                // Optimisation auto f_auto,q_auto pour économiser la data au Bénin
+                url = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+            }
         } catch (err) {
-            console.error("Erreur Storage:", err.message);
-            return; // On arrête silencieusement en cas d'erreur
+            console.error("Erreur Cloudinary:", err);
+            return alert("Erreur d'envoi de l'image.");
         }
     }
 
-    // ENVOI DANS LA TABLE MESSAGES
+    // --- ENREGISTREMENT DANS SUPABASE ---
     await _supabase.from('messages').insert([{
         sender_id: currentUser.id, 
         sender_phone: currentProfile.phone,
@@ -131,48 +90,15 @@ async function handleSend() {
         time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
     }]);
 
-    // NETTOYAGE IMMÉDIAT
     input.value = ""; 
-    fileInput.value = ""; // Très important pour pouvoir renvoyer la même image plus tard
+    fileInput.value = ""; 
     input.style.height = 'auto';
     cancelReply();
-    
-    const box = document.getElementById('chat-box');
-    box.scrollTop = box.scrollHeight;
 }
 
-// --- RÉPONDRE (GLISSER/CLIC) (Point 11) ---
-function setReply(id, phone) {
-    replyToId = id;
-    document.getElementById('reply-preview').style.display = 'flex';
-    document.getElementById('reply-user').innerText = phone;
-    document.getElementById('reply-text').innerText = "Répondre à ce message...";
-    document.getElementById('msgInput').focus();
-}
-
-function cancelReply() {
-    replyToId = null;
-    document.getElementById('reply-preview').style.display = 'none';
-}
-
-// --- EXPORT EXCEL (Point 4) ---
-async function exporterContacts() {
-    const {data} = await _supabase.from('profiles').select('phone, email');
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Membres");
-    XLSX.writeFile(wb, "Membres_SuccesBonheur.xlsx");
-}
-
-// --- GESTION MENU ---
-function toggleMenu() {
-    const d = document.getElementById('adminDropdown');
-    d.style.display = (d.style.display === "block") ? "none" : "block";
-}
-// --- CHARGEMENT DU CHAT ---
+// --- LOGIQUE CHAT ---
 async function loadChat() {
-    const { data, error } = await _supabase.from('messages').select('*').order('id', {ascending: true});
-    if (error) console.log(error);
+    const { data } = await _supabase.from('messages').select('*').order('id', {ascending: true});
     const box = document.getElementById('chat-box');
     box.innerHTML = "";
     if(data) data.forEach(m => renderMsg(m));
@@ -183,10 +109,9 @@ function renderMsg(m) {
     const box = document.getElementById('chat-box');
     const div = document.createElement('div');
     div.className = `msg ${m.sender_id === currentUser.id ? 'me' : 'other'}`;
-    
     div.innerHTML = `
         <small style="font-weight:bold; color:#075E54;">${m.sender_phone}</small>
-        ${m.image_url ? `<img src="${m.image_url}" class="chat-img">` : ''}
+        ${m.image_url ? `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px; margin-top:5px;">` : ''}
         <p style="margin:5px 0;">${m.content || ''}</p>
         <small style="font-size:10px; color:gray; display:block; text-align:right;">${m.time}</small>
     `;
@@ -194,198 +119,22 @@ function renderMsg(m) {
     box.scrollTop = box.scrollHeight;
 }
 
-// --- ÉCOUTE DES NOUVEAUX MESSAGES ---
 function listenRealtime() {
     _supabase.channel('public:messages').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
         renderMsg(payload.new);
     }).subscribe();
 }
 
-// --- COMPRESSION PHOTO (INDISPENSABLE) ---
-async function compressImg(file) {
-    return new Promise(res => {
-        const reader = new FileReader(); reader.readAsDataURL(file);
-        reader.onload = e => {
-            const img = new Image(); img.src = e.target.result;
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const max = 800; let w = img.width, h = img.height;
-                if(w > max){ h *= max/w; w = max; }
-                canvas.width = w; canvas.height = h;
-                ctx.drawImage(img, 0, 0, w, h);
-                canvas.toBlob(blob => res(blob), 'image/jpeg', 0.7);
-            }
-        }
-    });
-}
+// --- AUTRES FONCTIONS ---
+function cancelReply() { replyToId = null; document.getElementById('reply-preview').style.display = 'none'; }
+async function handleLogout() { await _supabase.auth.signOut(); location.reload(); }
 
-// Fonction pour basculer entre Connexion et Inscription
-function toggleAuthMode(isRegister) {
-    document.getElementById('login-fields').style.display = isRegister ? 'none' : 'block';
-    document.getElementById('register-fields').style.display = isRegister ? 'block' : 'none';
-    document.getElementById('auth-title').innerText = isRegister ? 'S\'inscrire' : 'Connexion';
-}
-
-// Action de CONNEXION pure
-async function handleLoginAction() {
-    let input = document.getElementById('auth-email').value.trim();
-    const password = document.getElementById('auth-password').value;
-
-    if(!input || !password) return alert("Veuillez remplir tous les champs !");
-
-    let loginEmail = input;
-
-    // Si c'est un numéro, on récupère le mail pour Supabase
-    if (!input.includes("@")) {
-        const { data } = await _supabase
-            .from('profiles')
-            .select('email')
-            .eq('phone', input)
-            .single();
-        
-        if (!data) return alert("Numéro inconnu.");
-        loginEmail = data.email;
-    }
-
-    const { error } = await _supabase.auth.signInWithPassword({ 
-        email: loginEmail, 
-        password: password 
-    });
-
-    if (error) return alert("Connexion échouée : " + error.message);
-    
-    checkSession();
-}
-
-// Action d'INSCRIPTION pure (Version Corrigée)
-async function handleRegisterAction() {
-    const phone = document.getElementById('auth-phone').value.trim();
-    const email = document.getElementById('reg-email').value.trim();
-    const password = document.getElementById('reg-password').value;
-
-    if(!phone || !email || !password) return alert("Remplissez tout pour l'inscription !");
-
-    // 1. Création du compte dans le système d'authentification Supabase
-    const { data, error } = await _supabase.auth.signUp({ 
-        email, 
-        password, 
-        options: { data: { phone: phone } } 
-    });
-
-    if (error) return alert(error.message);
-
-    // 2. Création du profil public dans TA table 'profiles'
-    if(data.user) {
-        // ON AJOUTE L'EMAIL ICI POUR LA RÉCUPÉRATION FUTURE
-        const { error: profileError } = await _supabase.from('profiles').insert([
-            { 
-                id: data.user.id, 
-                phone: phone, 
-                email: email // <--- Très important !
-            }
-        ]);
-
-        if(profileError) {
-            console.error("Erreur profil:", profileError);
-            return alert("Compte créé, mais erreur lors de l'enregistrement du profil.");
-        }
-
-        alert("Inscription réussie ! Un mail de confirmation vous a été envoyé à " + email + ". Validez-le pour pouvoir vous connecter.");
-        toggleAuthMode(false); 
-    }
-}
-
-async function handleLogout() {
-    await _supabase.auth.signOut();
-    location.reload();
-}
-
-// --- CHARGER LA LISTE DES MEMBRES ---
-async function loadMembers() {
-    const list = document.getElementById('members-list');
-    if (!list) return; // Sécurité pour éviter les bugs
-    
-    list.innerHTML = "<p style='text-align:center;'>Chargement des membres...</p>";
-
-    // Récupération des données depuis Supabase
-    const { data, error } = await _supabase.from('profiles').select('*');
-
-    if (error) {
-        list.innerHTML = "<p style='color:red; text-align:center;'>Erreur de chargement.</p>";
-        console.error(error);
-        return;
-    }
-
-    list.innerHTML = ""; // On vide le message de chargement
-
-    data.forEach(member => {
-        const div = document.createElement('div');
-        div.className = 'member-row';
-        div.style = "background:white; margin:10px; padding:15px; border-radius:12px; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
-        
-        // Correction ici : On utilise des ` au lieu de ' pour éviter le bug de "d'email"
-        div.innerHTML = `
-            <div>
-                <b style="color:#075E54;">${member.phone}</b><br>
-                <small style="color:gray;">${member.email || "Pas d'email"}</small>
-            </div>
-            <button onclick="openPrivate('${member.id}', '${member.phone}')" style="background:#25D366; color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer;">✉️</button>
-        `;
-        list.appendChild(div);
-    });
-}
-
-// --- FONCTIONS POUR LE PRIVÉ ---
-function openPrivate(destId, destPhone) {
-    document.getElementById('dest-display').innerText = destPhone;
-    window.currentDestId = destId; 
-    showView('page-editor');
-}
-
-async function executeSendPrivate() {
-    const content = document.getElementById('edit-msg').value;
-    if(!content) return;
-
-    // Ici tu peux ajouter la logique d'envoi à une table "private_messages" si tu l'as créée
-    alert("Message privé envoyé à " + document.getElementById('dest-display').innerText);
-    document.getElementById('edit-msg').value = "";
-    goBack();
-}
-    
-function togglePass(fieldId, icon) {
-    const field = document.getElementById(fieldId);
-    if (field.type === "password") {
-        field.type = "text";
-        icon.innerText = "🔒"; // Change l'icône quand c'est visible
-    } else {
-        field.type = "password";
-        icon.innerText = "👁️";
-    }
-}
-
-async function handleForgotPassword() {
-    let input = document.getElementById('auth-email').value.trim();
-    if (!input) return alert("Veuillez saisir votre numéro ou votre email.");
-
-    let emailToSend = input;
-    if (!input.includes("@")) {
-        const { data } = await _supabase.from('profiles').select('email').eq('phone', input).single();
-        if (!data) return alert("Numéro inconnu.");
-        emailToSend = data.email;
-    }
-
-    // ON DÉFINIT ICI L'URL DE REDIRECTION VERS TON NOUVEAU FICHIER
-    const { error } = await _supabase.auth.resetPasswordForEmail(emailToSend, {
-        redirectTo: 'https://sbchatmessage.netlify.app/reset.html', 
-    });
-
-    if (error) alert("Erreur : " + error.message);
-    else alert("Lien envoyé ! Vérifiez votre boîte mail.");
-}
-
-// 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
-// C'est cette ligne qui empêche le retour forcé au login lors d'un rafraîchissement !
+// --- INITIALISATION FINALE ---
 window.onload = checkSession;
 
-
+document.getElementById('msgInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+    }
+});
