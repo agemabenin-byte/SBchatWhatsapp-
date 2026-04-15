@@ -268,4 +268,26 @@ function listenRealtime() {
     _supabase.channel('public:messages').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, p => renderMsg(p.new)).subscribe();
 }
 
+async function handleForgotPassword() {
+    let input = document.getElementById('auth-email').value.trim();
+    if (!input) return alert("Veuillez saisir votre numéro ou votre email.");
+
+    let emailToSend = input;
+    if (!input.includes("@")) {
+        const { data } = await _supabase.from('profiles').select('email').eq('phone', input).single();
+        if (!data) return alert("Numéro inconnu.");
+        emailToSend = data.email;
+    }
+
+    // ON DÉFINIT ICI L'URL DE REDIRECTION VERS TON NOUVEAU FICHIER
+    const { error } = await _supabase.auth.resetPasswordForEmail(emailToSend, {
+        redirectTo: 'https://sbchatmessage.netlify.app/reset.html', 
+    });
+
+    if (error) alert("Erreur : " + error.message);
+    else alert("Lien envoyé ! Vérifiez votre boîte mail.");
+}
+
+// 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
+// C'est cette ligne qui empêche le retour forcé au login lors d'un rafraîchissement !
 window.onload = checkSession;
