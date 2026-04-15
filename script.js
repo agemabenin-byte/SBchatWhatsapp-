@@ -107,12 +107,12 @@ async function executeSendPrivate() {
     const content = document.getElementById('edit-msg').value;
     if(!content || !window.currentDestId) return alert("Message vide !");
 
-    // Correction selon ta table : from_id, to_id, sender_phone
+    // On inclut maintenant le sender_phone puisque la colonne existe
     const { error } = await _supabase.from('inbox').insert([{
         from_id: currentUser.id,
         to_id: window.currentDestId,
         content: content,
-        sender_phone: currentProfile.phone,
+        sender_phone: currentProfile.phone, // Ton numéro stocké dans currentProfile
         time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
     }]);
 
@@ -129,18 +129,27 @@ async function loadInbox() {
     const box = document.getElementById('inbox-list');
     if(!box) return;
     box.innerHTML = "Chargement...";
-    const { data, error } = await _supabase.from('inbox').select('*').eq('to_id', currentUser.id).order('id', {ascending: false});
+
+    const { data, error } = await _supabase
+        .from('inbox')
+        .select('*')
+        .eq('to_id', currentUser.id)
+        .order('id', {ascending: false});
     
-    if(error) return box.innerHTML = "Erreur.";
+    if(error) return box.innerHTML = "Erreur de chargement.";
     box.innerHTML = "";
+
     if(data && data.length > 0) {
         data.forEach(msg => {
             const div = document.createElement('div');
             div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
-            div.innerHTML = `<b>De: ${msg.sender_phone}</b><p style="margin:5px 0;">${msg.content}</p><small>${msg.time}</small>`;
+            // On utilise directement msg.sender_phone qui est maintenant stocké
+            div.innerHTML = `<b>De: ${msg.sender_phone || 'Inconnu'}</b><p style="margin:5px 0;">${msg.content}</p><small>${msg.time}</small>`;
             box.appendChild(div);
         });
-    } else { box.innerHTML = "<p style='text-align:center;'>Aucun message privé.</p>"; }
+    } else { 
+        box.innerHTML = "<p style='text-align:center;'>Aucun message reçu.</p>"; 
+    }
 }
 
 // --- DIFFUSION (BROADCAST) - RÉPARÉ ---
@@ -148,14 +157,15 @@ async function executeBroadcast() {
     const content = document.getElementById('broadcast-msg').value;
     if(!content) return alert("Entrez un message !");
 
-    // L'objectif ici est d'envoyer un message privé (inbox) à CHAQUE membre
-    const { data: allMembers } = await _supabase.from('profiles').select('id');
+    const { data: allMembers, error: errMem } = await _supabase.from('profiles').select('id');
+    if(errMem) return alert("Erreur membres: " + errMem.message);
     
+    // Préparation de l'envoi groupé avec ton numéro
     const messages = allMembers.map(member => ({
         from_id: currentUser.id,
         to_id: member.id,
         content: content,
-        sender_phone: "ADMIN 📢",
+        sender_phone: currentProfile.phone, // On identifie l'admin par son numéro
         time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
     }));
 
@@ -164,11 +174,12 @@ async function executeBroadcast() {
     if(error) {
         alert("Erreur diffusion : " + error.message);
     } else {
-        alert("Message diffusé à tous les membres dans leur Inbox !");
+        alert("Message diffusé avec succès !");
         document.getElementById('broadcast-msg').value = "";
         goBack();
     }
 }
+
 
 // --- LISTE DES MEMBRES ---
 async function loadMembers() {
