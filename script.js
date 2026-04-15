@@ -27,7 +27,7 @@ function showView(viewId, isBack = false) {
     if (viewId === 'page-inbox') loadInbox();
 }
 
-// --- SESSION ---
+// --- SESSION (MISE À JOUR) ---
 async function checkSession() {
     const { data } = await _supabase.auth.getSession();
     if (data && data.session) {
@@ -36,11 +36,20 @@ async function checkSession() {
         if (prof) {
             currentProfile = prof;
             document.getElementById('welcomeText').innerText = `Salut ${prof.phone}`;
-            showView('page-chat');
+            
+            // --- ON REMPLACE ICI ---
+            history.replaceState({ viewId: 'page-chat' }, "", ""); // On définit le point de départ
+            showView('page-chat', true); // On affiche sans créer de doublon dans l'historique
+            // -----------------------
+
             loadChat();
             listenRealtime();
-        } else { showView('page-login'); }
-    } else { showView('page-login'); }
+        } else { 
+            showView('page-login', true); 
+        }
+    } else { 
+        showView('page-login', true); 
+    }
 }
 
 // --- ENVOI CHAT (AVEC CLOUDINARY) ---
