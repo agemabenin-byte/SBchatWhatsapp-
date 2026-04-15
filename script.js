@@ -41,7 +41,7 @@ async function checkSession() {
     } else { showView('page-login'); }
 }
 
-// --- CHAT ET CLOUDINARY ---
+// --- ENVOI CHAT (AVEC CLOUDINARY) ---
 async function handleFileSelect() {
     const file = document.getElementById('file-input').files[0];
     if (file) await handleSend();
@@ -67,19 +67,110 @@ async function handleSend() {
             });
             const data = await response.json();
             if(data.secure_url) url = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
-        } catch (err) { return alert("Erreur envoi image Cloudinary."); }
+        } catch (err) { console.error(err); return alert("Erreur image."); }
     }
 
     await _supabase.from('messages').insert([{
-        sender_id: currentUser.id, sender_phone: currentProfile.phone,
-        content: content, image_url: url, reply_to_id: replyToId,
+        sender_id: currentUser.id, 
+        sender_phone: currentProfile.phone,
+        content: content, 
+        image_url: url, 
+        reply_to_id: replyToId,
         time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
     }]);
 
     input.value = ""; fileInput.value = ""; cancelReply();
 }
 
-// --- MEMBRES ET PRIVÉ (INBOX) ---
+// --- EXCEL (RÉPARÉ) ---
+async function exporterContacts() {
+    try {
+        const { data, error } = await _supabase.from('profiles').select('phone, email');
+        if (error) throw error;
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Membres");
+        XLSX.writeFile(wb, "Membres_SuccesBonheur.xlsx");
+    } catch (err) {
+        alert("Erreur Excel : " + err.message);
+    }
+}
+
+// --- MESSAGES PRIVÉS (INBOX) - RÉPARÉ ---
+function openPrivate(destId, destPhone) {
+    document.getElementById('dest-display').innerText = destPhone;
+    window.currentDestId = destId; 
+    showView('page-editor');
+}
+
+async function executeSendPrivate() {
+    const content = document.getElementById('edit-msg').value;
+    if(!content || !window.currentDestId) return alert("Message vide !");
+
+    // Correction selon ta table : from_id, to_id, sender_phone
+    const { error } = await _supabase.from('inbox').insert([{
+        from_id: currentUser.id,
+        to_id: window.currentDestId,
+        content: content,
+        sender_phone: currentProfile.phone,
+        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+    }]);
+
+    if(error) {
+        alert("Erreur d'envoi : " + error.message);
+    } else {
+        alert("Message privé envoyé !");
+        document.getElementById('edit-msg').value = "";
+        goBack();
+    }
+}
+
+async function loadInbox() {
+    const box = document.getElementById('inbox-list');
+    if(!box) return;
+    box.innerHTML = "Chargement...";
+    const { data, error } = await _supabase.from('inbox').select('*').eq('to_id', currentUser.id).order('id', {ascending: false});
+    
+    if(error) return box.innerHTML = "Erreur.";
+    box.innerHTML = "";
+    if(data && data.length > 0) {
+        data.forEach(msg => {
+            const div = document.createElement('div');
+            div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
+            div.innerHTML = `<b>De: ${msg.sender_phone}</b><p style="margin:5px 0;">${msg.content}</p><small>${msg.time}</small>`;
+            box.appendChild(div);
+        });
+    } else { box.innerHTML = "<p style='text-align:center;'>Aucun message privé.</p>"; }
+}
+
+// --- DIFFUSION (BROADCAST) - RÉPARÉ ---
+async function executeBroadcast() {
+    const content = document.getElementById('broadcast-msg').value;
+    if(!content) return alert("Entrez un message !");
+
+    // L'objectif ici est d'envoyer un message privé (inbox) à CHAQUE membre
+    const { data: allMembers } = await _supabase.from('profiles').select('id');
+    
+    const messages = allMembers.map(member => ({
+        from_id: currentUser.id,
+        to_id: member.id,
+        content: content,
+        sender_phone: "ADMIN 📢",
+        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+    }));
+
+    const { error } = await _supabase.from('inbox').insert(messages);
+
+    if(error) {
+        alert("Erreur diffusion : " + error.message);
+    } else {
+        alert("Message diffusé à tous les membres dans leur Inbox !");
+        document.getElementById('broadcast-msg').value = "";
+        goBack();
+    }
+}
+
+// --- LISTE DES MEMBRES ---
 async function loadMembers() {
     const list = document.getElementById('members-list');
     list.innerHTML = "Chargement...";
@@ -88,62 +179,14 @@ async function loadMembers() {
     data.forEach(m => {
         const div = document.createElement('div');
         div.className = 'member-row';
-        div.style = "background:white; margin:10px; padding:15px; border-radius:12px; display:flex; justify-content:space-between;";
+        div.style = "background:white; margin:10px; padding:15px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;";
         div.innerHTML = `<div><b>${m.phone}</b><br><small>${m.email || ''}</small></div>
-                         <button onclick="openPrivate('${m.id}', '${m.phone}')" style="background:#25D366; color:white; border:none; padding:8px; border-radius:5px;">✉️</button>`;
+                         <button onclick="openPrivate('${m.id}', '${m.phone}')" style="background:#25D366; color:white; border:none; padding:8px 12px; border-radius:8px;">✉️</button>`;
         list.appendChild(div);
     });
 }
 
-function openPrivate(destId, destPhone) {
-    document.getElementById('dest-display').innerText = destPhone;
-    window.currentDestId = destId;
-    showView('page-editor');
-}
-
-async function executeSendPrivate() {
-    const content = document.getElementById('edit-msg').value;
-    if(!content) return;
-    const { error } = await _supabase.from('inbox').insert([{
-        from_id: currentUser.id, to_id: window.currentDestId,
-        content: content, sender_phone: currentProfile.phone,
-        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
-    }]);
-    if(!error) { alert("Envoyé !"); goBack(); }
-}
-
-async function loadInbox() {
-    const box = document.getElementById('inbox-list');
-    const { data } = await _supabase.from('inbox').select('*').eq('to_id', currentUser.id).order('id', {ascending: false});
-    box.innerHTML = data.length ? "" : "Aucun message.";
-    data.forEach(msg => {
-        const div = document.createElement('div');
-        div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366;";
-        div.innerHTML = `<b>De: ${msg.sender_phone}</b><p>${msg.content}</p><small>${msg.time}</small>`;
-        box.appendChild(div);
-    });
-}
-
-// --- DIFFUSION (BROADCAST) ---
-async function executeBroadcast() {
-    const content = document.getElementById('broadcast-msg').value;
-    if(!content) return;
-    // Ici on envoie dans le chat général au nom de l'admin
-    await _supabase.from('messages').insert([{
-        sender_id: currentUser.id, sender_phone: "ADMIN 📢",
-        content: content, time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
-    }]);
-    alert("Message diffusé !");
-    goBack();
-}
-
-// --- AUTHENTIFICATION ---
-function toggleAuthMode(isRegister) {
-    document.getElementById('login-fields').style.display = isRegister ? 'none' : 'block';
-    document.getElementById('register-fields').style.display = isRegister ? 'block' : 'none';
-    document.getElementById('auth-title').innerText = isRegister ? 'S\'inscrire' : 'Connexion';
-}
-
+// --- AUTH & UI ---
 async function handleLoginAction() {
     let input = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
@@ -153,38 +196,43 @@ async function handleLoginAction() {
         if (!data) return alert("Numéro inconnu.");
         loginEmail = data.email;
     }
-    const { error } = await _supabase.auth.signInWithPassword({ email: loginEmail, password });
-    if (error) alert(error.message); else checkSession();
+    const { error } = await _supabase.auth.signInWithPassword({ email: loginEmail, password: password });
+    if (error) return alert(error.message);
+    checkSession();
 }
 
 async function handleRegisterAction() {
     const phone = document.getElementById('auth-phone').value.trim();
     const email = document.getElementById('reg-email').value.trim();
     const password = document.getElementById('reg-password').value;
-    const { data, error } = await _supabase.auth.signUp({ email, password });
+    const { data, error } = await _supabase.auth.signUp({ email, password, options: { data: { phone: phone } } });
     if (error) return alert(error.message);
     if(data.user) {
-        await _supabase.from('profiles').insert([{ id: data.user.id, phone, email }]);
-        alert("Inscrit ! Vérifiez vos mails.");
-        toggleAuthMode(false);
+        await _supabase.from('profiles').insert([{ id: data.user.id, phone: phone, email: email }]);
+        alert("Vérifiez vos emails !");
+        toggleAuthMode(false); 
     }
 }
 
-// --- TOOLS ---
+function toggleAuthMode(isRegister) {
+    document.getElementById('login-fields').style.display = isRegister ? 'none' : 'block';
+    document.getElementById('register-fields').style.display = isRegister ? 'block' : 'none';
+    document.getElementById('auth-title').innerText = isRegister ? 'S\'inscrire' : 'Connexion';
+}
+
 function toggleMenu() {
     const d = document.getElementById('adminDropdown');
     d.style.display = (d.style.display === "block") ? "none" : "block";
 }
 function autoResize(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
 function togglePass(id, icon) {
-    const f = document.getElementById(id);
-    f.type = f.type === "password" ? "text" : "password";
-    icon.innerText = f.type === "password" ? "👁️" : "🔒";
+    const f = document.getElementById(id); f.type = (f.type === "password") ? "text" : "password";
+    icon.innerText = (f.type === "password") ? "👁️" : "🔒";
 }
 function cancelReply() { replyToId = null; document.getElementById('reply-preview').style.display = 'none'; }
 async function handleLogout() { await _supabase.auth.signOut(); location.reload(); }
 
-// --- RENDER & REALTIME ---
+// --- CHAT RENDER ---
 async function loadChat() {
     const { data } = await _supabase.from('messages').select('*').order('id', {ascending: true});
     const box = document.getElementById('chat-box');
@@ -198,9 +246,9 @@ function renderMsg(m) {
     const div = document.createElement('div');
     div.className = `msg ${m.sender_id === currentUser.id ? 'me' : 'other'}`;
     div.innerHTML = `<small><b>${m.sender_phone}</b></small>
-                     ${m.image_url ? `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:10px;">` : ''}
+                     ${m.image_url ? `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px;">` : ''}
                      <p>${m.content || ''}</p>
-                     <small style="font-size:10px; text-align:right; display:block;">${m.time}</small>`;
+                     <small style="font-size:10px; display:block; text-align:right;">${m.time}</small>`;
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
 }
