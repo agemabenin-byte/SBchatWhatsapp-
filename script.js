@@ -4,6 +4,7 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const ADMINS_PHONES = ["002290140804495", "002290140804494", "002290196479181", "002290167648919", "002290195618690"];
 let currentUser = null, currentProfile = null, replyToId = null, viewHistory = ['page-login'];
+let viewHistory = ['page-login']; // On commence toujours par la page de connexion
 
 // --- NAVIGATION ---
 function showView(viewId) {
