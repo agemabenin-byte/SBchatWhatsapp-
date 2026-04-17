@@ -333,6 +333,34 @@ async function handleForgotPassword() {
     else alert("Lien envoyé ! Vérifiez votre boîte mail.");
 }
 
+// Pour la diffusion
+async function handleBroadcastMedia(type) {
+    const inputId = type === 'image' ? 'bc-photo-input' : 'bc-video-input';
+    const file = document.getElementById(inputId).files[0];
+    if (!file) return;
+
+    let url = (type === 'image') ? await uploadImage(file) : await uploadToVideoCloud(file);
+
+    if (url) {
+        document.getElementById('broadcast-msg').value += "\n" + url;
+        alert("Fichier prêt ! Le lien a été ajouté à votre message.");
+    }
+}
+
+// Pour l'inbox (Privé)
+async function handleInboxMedia(type) {
+    const inputId = type === 'image' ? 'inbox-photo-input' : 'inbox-video-input';
+    const file = document.getElementById(inputId).files[0];
+    if (!file) return;
+
+    let url = (type === 'image') ? await uploadImage(file) : await uploadToVideoCloud(file);
+
+    if (url) {
+        document.getElementById('edit-msg').value += "\n" + url;
+        alert("Média prêt pour l'envoi privé !");
+    }
+}
+
 // 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
 // C'est cette ligne qui empêche le retour forcé au login lors d'un rafraîchissement !
 window.onload = checkSession;
