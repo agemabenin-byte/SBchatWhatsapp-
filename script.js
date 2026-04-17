@@ -408,19 +408,62 @@ async function handleAdminFileSelect() {
     const file = fileInput.files[0];
     if (!file) return;
 
-    // On utilise ton nouveau fichier cloudinary-videos-fichiers.js
-    const url = await uploadToVideoCloud(file);
+    // --- AFFICHER LA BARRE DE PROGRESSION ---
+    const progressContainer = document.getElementById('upload-progress-container');
+    const progressBar = document.getElementById('upload-progress-bar');
+    const progressText = document.getElementById('upload-progress-text');
+    
+    progressContainer.style.display = 'flex';
+    progressBar.style.width = '0%';
+    progressText.innerText = '0%';
 
-    if (url) {
-        // On met l'URL dans le champ de saisie et on simule un envoi
-        const input = document.getElementById('msgInput');
-        input.value = (input.value ? input.value + "\n" : "") + url;
-        
-        // On peut soit laisser l'admin cliquer sur envoyer, soit l'envoyer direct :
-        handleSend(); 
-        alert("Fichier lourd envoyé avec succès !");
-    }
-    fileInput.value = ""; // On vide l'input
+    // --- MODIFICATION DE L'UPLOAD POUR GÉRER LA PROGRESSION ---
+    // Nous devons utiliser XMLHttpRequest au lieu de fetch pour avoir la progression
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', "video_preset"); // Ton preset unsigned
+
+    // On surveille le progrès
+    xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = percentComplete + '%';
+            progressText.innerText = percentComplete + '%';
+        }
+    });
+
+    // Une fois l'envoi terminé vers Cloudinary
+    xhr.addEventListener("load", async () => {
+        progressContainer.style.display = 'none'; // Cacher la barre
+        fileInput.value = ""; // Vider l'input
+
+        if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
+            if (data.secure_url) {
+                // On met l'URL dans le champ de saisie
+                const input = document.getElementById('msgInput');
+                input.value = (input.value ? input.value + "\n" : "") + data.secure_url;
+                
+                // On envoie direct dans le chat
+                await handleSend(); 
+                alert("Fichier lourd diffusé avec succès !");
+            }
+        } else {
+            alert("Erreur lors de l'envoi à Cloudinary.");
+            console.error(xhr.responseText);
+        }
+    });
+
+    xhr.addEventListener("error", () => {
+        progressContainer.style.display = 'none';
+        alert("Erreur réseau lors de l'envoi.");
+    });
+
+    // On lance l'envoi vers ton compte dn3vf0mhm (vidéos/fichiers)
+    const resourceType = file.type.startsWith('video/') ? "video" : "raw";
+    xhr.open("POST", `https://api.cloudinary.com/v1_1/dn3vf0mhm/${resourceType}/upload`);
+    xhr.send(formData);
 }
 
 // 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
