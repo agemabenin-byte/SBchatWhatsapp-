@@ -37,11 +37,12 @@ async function checkSession() {
             currentProfile = prof;
             document.getElementById('welcomeText').innerText = `Salut ${prof.phone}`;
             
-            // --- ON REMPLACE ICI ---
-            history.replaceState({ viewId: 'page-chat' }, "", ""); // On définit le point de départ
-            showView('page-chat', true); // On affiche sans créer de doublon dans l'historique
-            // -----------------------
+            // --- AJOUT ICI : ON VÉRIFIE SI C'EST UN ADMIN ---
+            gererAffichageAdmin(prof.phone);
+            // -----------------------------------------------
 
+            history.replaceState({ viewId: 'page-chat' }, "", "");
+            showView('page-chat', true);
             loadChat();
             listenRealtime();
         } else { 
@@ -359,6 +360,41 @@ async function handleInboxMedia(type) {
         document.getElementById('edit-msg').value += "\n" + url;
         alert("Média prêt pour l'envoi privé !");
     }
+}
+
+function gererAffichageAdmin(userPhone) {
+    if (ADMINS_PHONES.includes(userPhone)) {
+        // On affiche les trombones pour l'admin
+        const attachGroup = document.getElementById('admin-attach-btn');
+        const attachBC = document.getElementById('admin-bc-attach');
+        const attachInbox = document.getElementById('admin-inbox-attach');
+        const menuBtn = document.getElementById('adminMenuBtn');
+
+        if (attachGroup) attachGroup.style.display = 'inline-block';
+        if (attachBC) attachBC.style.display = 'inline-block';
+        if (attachInbox) attachInbox.style.display = 'inline-block';
+        if (menuBtn) menuBtn.style.display = 'block'; // S'assure que le menu ⋮ est visible
+    }
+}
+
+async function handleAdminFileSelect() {
+    const fileInput = document.getElementById('video-file-input');
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    // On utilise ton nouveau fichier cloudinary-videos-fichiers.js
+    const url = await uploadToVideoCloud(file);
+
+    if (url) {
+        // On met l'URL dans le champ de saisie et on simule un envoi
+        const input = document.getElementById('msgInput');
+        input.value = (input.value ? input.value + "\n" : "") + url;
+        
+        // On peut soit laisser l'admin cliquer sur envoyer, soit l'envoyer direct :
+        handleSend(); 
+        alert("Fichier lourd envoyé avec succès !");
+    }
+    fileInput.value = ""; // On vide l'input
 }
 
 // 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
