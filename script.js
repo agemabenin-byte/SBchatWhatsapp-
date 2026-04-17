@@ -328,8 +328,24 @@ function renderMsg(m) {
     const box = document.getElementById('chat-box');
     const div = document.createElement('div');
     div.className = `msg ${m.sender_id === currentUser.id ? 'me' : 'other'}`;
+    
+    // --- LOGIQUE D'AFFICHAGE DU MÉDIA (IMAGE OU VIDÉO) ---
+    let mediaHtml = '';
+    if (m.image_url) {
+        // Détection intelligente du format
+        if (m.image_url.match(/\.(mp4|mov)/i)) {
+            // C'est une vidéo -> On crée un lecteur
+            mediaHtml = `<video controls class="chat-img" style="max-width:100%; border-radius:8px; margin-top:5px;">
+                            <source src="${m.image_url}" type="video/mp4">
+                         </video>`;
+        } else {
+            // C'est une image -> On garde le code actuel
+            mediaHtml = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px;">`;
+        }
+    }
+
     div.innerHTML = `<small><b>${m.sender_phone}</b></small>
-                     ${m.image_url ? `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px;">` : ''}
+                     ${mediaHtml}
                      <p>${m.content || ''}</p>
                      <small style="font-size:10px; display:block; text-align:right;">${m.time}</small>`;
     box.appendChild(div);
