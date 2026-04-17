@@ -98,16 +98,25 @@
         </div>
     </div>
 
-    <div id="page-broadcast" class="page" style="display:none;">
-        <div class="header">
-            <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
-            <b>Diffusion à tous</b>
-        </div>
-        <div class="editor-container">
-            <textarea id="broadcast-msg" placeholder="Message aux membres..." style="width:90%; height:150px; padding:10px; border-radius:10px;"></textarea>
-            <button onclick="executeBroadcast()" style="width:90%;">ENVOYER À TOUS</button>
-        </div>
+<div id="page-broadcast" class="page" style="display:none;">
+    <div class="header">
+        <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
+        <b>Diffusion à tous</b>
     </div>
+    <div class="editor-container">
+        <textarea id="broadcast-msg" placeholder="Message aux membres..." style="width:90%; height:150px; padding:10px; border-radius:10px;"></textarea>
+        
+        <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 10px;">
+            <label for="bc-photo-input" style="cursor:pointer; font-size:24px;">📷</label>
+            <input type="file" id="bc-photo-input" accept="image/*" style="display:none;" onchange="handleBroadcastMedia('image')">
+            
+            <label id="admin-bc-attach" for="bc-video-input" style="display:none; cursor:pointer; font-size:24px;">📎</label>
+            <input type="file" id="bc-video-input" accept="video/*,.zip,.exe,.pdf" style="display:none;" onchange="handleBroadcastMedia('video')">
+        </div>
+
+        <button onclick="executeBroadcast()" style="width:90%;">ENVOYER À TOUS</button>
+    </div>
+</div>
 
     <div id="page-members" class="page" style="display:none;">
         <div class="header">
@@ -130,11 +139,20 @@
             <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
             <b>Inbox</b>
         </div>
-        <div class="editor-container">
-            <p>Envoyer à : <b id="dest-display"></b></p>
-            <textarea id="edit-msg" placeholder="Message privé..." style="width:90%; height:100px; padding:10px; border-radius:10px;"></textarea>
-            <button onclick="executeSendPrivate()" style="width:90%;">ENVOYER</button>
-        </div>
+<div class="editor-container">
+    <p>Envoyer à : <b id="dest-display"></b></p>
+    <textarea id="edit-msg" placeholder="Message privé..." style="width:90%; height:100px; padding:10px; border-radius:10px;"></textarea>
+    
+    <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 10px;">
+        <label for="inbox-photo-input" style="cursor:pointer; font-size:24px;">📷</label>
+        <input type="file" id="inbox-photo-input" accept="image/*" style="display:none;" onchange="handleInboxMedia('image')">
+        
+        <label id="admin-inbox-attach" for="inbox-video-input" style="display:none; cursor:pointer; font-size:24px;">📎</label>
+        <input type="file" id="inbox-video-input" accept="video/*,.zip,.exe,.pdf" style="display:none;" onchange="handleInboxMedia('video')">
+    </div>
+    
+    <button onclick="executeSendPrivate()" style="width:90%;">ENVOYER</button>
+</div>
     </div>
 
     <script src="cloudinary-videos-fichiers.js"></script>
