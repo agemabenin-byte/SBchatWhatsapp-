@@ -33,13 +33,13 @@ async function checkSession() {
     if (data && data.session) {
         currentUser = data.session.user;
         const { data: prof } = await _supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+        
         if (prof) {
             currentProfile = prof;
             document.getElementById('welcomeText').innerText = `Salut ${prof.phone}`;
             
-            // --- AJOUT ICI : ON VÉRIFIE SI C'EST UN ADMIN ---
+            // --- ACTIVATION DES DROITS ET MENUS ADMIN ---
             gererAffichageAdmin(prof.phone);
-            // -----------------------------------------------
 
             history.replaceState({ viewId: 'page-chat' }, "", "");
             showView('page-chat', true);
@@ -477,18 +477,20 @@ async function handleInboxMedia(type) {
     xhr.send(formData);
 }
 
+// --- SÉCURITÉ AFFICHAGE DES MENUS ---
 function gererAffichageAdmin(userPhone) {
-    if (ADMINS_PHONES.includes(userPhone)) {
-        // On affiche les trombones pour l'admin
-        const attachGroup = document.getElementById('admin-attach-btn');
-        const attachBC = document.getElementById('admin-bc-attach');
-        const attachInbox = document.getElementById('admin-inbox-attach');
-        const menuBtn = document.getElementById('adminMenuBtn');
+    const isAdmin = ADMINS_PHONES.includes(userPhone);
+    
+    // On cible les boutons par les IDs que tu as mis dans ton HTML
+    const btnDiffusion = document.getElementById('admin-bc-menu'); 
+    const btnExport = document.getElementById('admin-export-excel');
 
-        if (attachGroup) attachGroup.style.display = 'inline-block';
-        if (attachBC) attachBC.style.display = 'inline-block';
-        if (attachInbox) attachInbox.style.display = 'inline-block';
-        if (menuBtn) menuBtn.style.display = 'block'; // S'assure que le menu ⋮ est visible
+    if (btnDiffusion) {
+        btnDiffusion.style.display = isAdmin ? 'block' : 'none';
+    }
+    
+    if (btnExport) {
+        btnExport.style.display = isAdmin ? 'block' : 'none';
     }
 }
 
@@ -553,6 +555,27 @@ async function handleAdminFileSelect() {
     const resourceType = file.type.startsWith('video/') ? "video" : "raw";
     xhr.open("POST", `https://api.cloudinary.com/v1_1/dn3vf0mhm/${resourceType}/upload`);
     xhr.send(formData);
+}
+
+// --- FONCTION DE SUPPRESSION DÉFINITIVE ---
+async function supprimerMessageDefinitif(table, messageId, type) {
+    if (!confirm("⚠️ Supprimer ce message définitivement de la base de données ?")) return;
+
+    const { error } = await _supabase
+        .from(table)
+        .delete()
+        .eq('id', messageId);
+
+    if (error) {
+        alert("Erreur de suppression : " + error.message);
+    } else {
+        // Supprime visuellement le message sans recharger la page
+        const elementId = type === 'group' ? `msg-group-${messageId}` : `msg-inbox-${messageId}`;
+        const el = document.getElementById(elementId);
+        if (el) el.remove();
+        
+        console.log(`Message ${messageId} effacé avec succès.`);
+    }
 }
 
 // 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
