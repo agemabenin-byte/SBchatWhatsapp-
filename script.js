@@ -328,26 +328,33 @@ function renderMsg(m) {
     const box = document.getElementById('chat-box');
     const div = document.createElement('div');
     div.className = `msg ${m.sender_id === currentUser.id ? 'me' : 'other'}`;
-    
-    // --- LOGIQUE D'AFFICHAGE DU MÉDIA (IMAGE OU VIDÉO) ---
-    let mediaHtml = '';
-    if (m.image_url) {
-        // Détection intelligente du format
-        if (m.image_url.match(/\.(mp4|mov)/i)) {
-            // C'est une vidéo -> On crée un lecteur
-            mediaHtml = `<video controls class="chat-img" style="max-width:100%; border-radius:8px; margin-top:5px;">
-                            <source src="${m.image_url}" type="video/mp4">
-                         </video>`;
-        } else {
-            // C'est une image -> On garde le code actuel
-            mediaHtml = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px;">`;
-        }
+
+    let contenuFinal = m.content || '';
+
+    // Détection Vidéo dans le texte
+    if (contenuFinal.includes('.mp4') || contenuFinal.includes('.mov')) {
+        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.mp4|\.mov)[^\s]*)/g, 
+            `<video controls style="max-width:100%; border-radius:8px; margin-top:5px;">
+                <source src="$1" type="video/mp4">
+             </video>`);
+    } 
+    // Détection Image dans le texte (si pas déjà géré par m.image_url)
+    else if (contenuFinal.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
+        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.jpg|\.png|\.jpeg|\.webp)[^\s]*)/g, 
+            `<img src="$1" style="max-width:100%; border-radius:8px; margin-top:5px;">`);
+    }
+
+    // Gestion de la colonne image_url (ton système actuel pour les photos simples)
+    let mediaSupplementaire = "";
+    if (m.image_url && !contenuFinal.includes(m.image_url)) {
+         mediaSupplementaire = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px;">`;
     }
 
     div.innerHTML = `<small><b>${m.sender_phone}</b></small>
-                     ${mediaHtml}
-                     <p>${m.content || ''}</p>
+                     ${mediaSupplementaire}
+                     <div>${contenuFinal}</div>
                      <small style="font-size:10px; display:block; text-align:right;">${m.time}</small>`;
+    
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
 }
@@ -396,12 +403,43 @@ async function handleInboxMedia(type) {
     const file = document.getElementById(inputId).files[0];
     if (!file) return;
 
-    let url = (type === 'image') ? await uploadImage(file) : await uploadToVideoCloud(file);
+    // Affiche la barre de progression que tu as déjà créée pour le groupe
+    const progressContainer = document.getElementById('upload-progress-container');
+    const progressBar = document.getElementById('upload-progress-bar');
+    const progressText = document.getElementById('upload-progress-text');
+    
+    progressContainer.style.display = 'flex';
 
-    if (url) {
-        document.getElementById('edit-msg').value += "\n" + url;
-        alert("Média prêt pour l'envoi privé !");
-    }
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', "video_preset"); // Utilise ton preset
+
+    xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = percent + '%';
+            progressText.innerText = percent + '%';
+        }
+    });
+
+    xhr.addEventListener("load", async () => {
+        progressContainer.style.display = 'none';
+        if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
+            if (data.secure_url) {
+                // Au lieu du alert, on ajoute directement l'URL dans le champ texte
+                const input = document.getElementById('edit-msg');
+                input.value = (input.value ? input.value + "\n" : "") + data.secure_url;
+                // Optionnel : tu peux même déclencher executeSendPrivate() automatiquement ici
+            }
+        }
+    });
+
+    const cloudName = "dn3vf0mhm"; // Ton compte vidéo
+    const resourceType = type === 'image' ? "image" : "video";
+    xhr.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`);
+    xhr.send(formData);
 }
 
 function gererAffichageAdmin(userPhone) {
