@@ -389,12 +389,50 @@ async function handleBroadcastMedia(type) {
     const file = document.getElementById(inputId).files[0];
     if (!file) return;
 
-    let url = (type === 'image') ? await uploadImage(file) : await uploadToVideoCloud(file);
+    // --- ACTIVATION BARRE DE PROGRESSION ---
+    const progressContainer = document.getElementById('upload-progress-container');
+    const progressBar = document.getElementById('upload-progress-bar');
+    const progressText = document.getElementById('upload-progress-text');
+    
+    progressContainer.style.display = 'flex';
+    progressBar.style.width = '0%';
+    progressText.innerText = '0%';
 
-    if (url) {
-        document.getElementById('broadcast-msg').value += "\n" + url;
-        alert("Fichier prêt ! Le lien a été ajouté à votre message.");
-    }
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', "video_preset"); 
+
+    xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = percent + '%';
+            progressText.innerText = `Préparation diffusion : ${percent}%`;
+        }
+    });
+
+    xhr.addEventListener("load", async () => {
+        progressContainer.style.display = 'none';
+        if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
+            if (data.secure_url) {
+                // On ajoute le lien au textarea sans popup !
+                const broadcastInput = document.getElementById('broadcast-msg');
+                broadcastInput.value = (broadcastInput.value ? broadcastInput.value + "\n" : "") + data.secure_url;
+                
+                // On vide l'input file pour le prochain envoi
+                document.getElementById(inputId).value = "";
+            }
+        } else {
+            alert("Erreur lors de l'upload.");
+        }
+    });
+
+    // On utilise ton compte vidéo pour tout (plus simple)
+    const cloudName = "dn3vf0mhm";
+    const resourceType = type === 'image' ? "image" : "video";
+    xhr.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`);
+    xhr.send(formData);
 }
 
 // Pour l'inbox (Privé)
