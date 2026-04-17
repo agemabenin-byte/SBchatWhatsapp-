@@ -148,7 +148,10 @@ async function executeSendPrivate() {
         alert("Erreur d'envoi : " + error.message);
     } else {
         alert("Message privé envoyé !");
-        document.getElementById('edit-msg').value = "";
+        // NETTOYAGE
+    document.getElementById('edit-msg').value = ""; // Vide le texte
+    document.getElementById('inbox-photo-input').value = ""; // Vide l'image sélectionnée
+    document.getElementById('inbox-video-input').value = ""; // Vide le fichier sélectionné
         goBack();
     }
 }
