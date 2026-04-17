@@ -325,32 +325,20 @@ function renderMsg(m) {
     const box = document.getElementById('chat-box');
     const div = document.createElement('div');
     div.className = `msg ${m.sender_id === currentUser.id ? 'me' : 'other'}`;
+    div.id = `msg-group-${m.id}`; // ID indispensable pour la suppression visuelle
 
-    let contenuFinal = m.content || '';
+    // --- TON CODE ICI ---
+    const isAdmin = currentProfile && ADMINS_PHONES.includes(currentProfile.phone);
+    const iconeSuppr = isAdmin ? `<span onclick="supprimerMessageDefinitif('messages', ${m.id}, 'group')" style="cursor:pointer; color:red; float:right; margin-left:10px;">🗑️</span>` : "";
+    // --------------------
 
-    // Détection Vidéo dans le texte
-    if (contenuFinal.includes('.mp4') || contenuFinal.includes('.mov')) {
-        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.mp4|\.mov)[^\s]*)/g, 
-            `<video controls style="max-width:100%; border-radius:8px; margin-top:5px;">
-                <source src="$1" type="video/mp4">
-             </video>`);
-    } 
-    // Détection Image dans le texte (si pas déjà géré par m.image_url)
-    else if (contenuFinal.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
-        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.jpg|\.png|\.jpeg|\.webp)[^\s]*)/g, 
-            `<img src="$1" style="max-width:100%; border-radius:8px; margin-top:5px;">`);
-    }
-
-    // Gestion de la colonne image_url (ton système actuel pour les photos simples)
-    let mediaSupplementaire = "";
-    if (m.image_url && !contenuFinal.includes(m.image_url)) {
-         mediaSupplementaire = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px;">`;
-    }
-
-    div.innerHTML = `<small><b>${m.sender_phone}</b></small>
-                     ${mediaSupplementaire}
-                     <div>${contenuFinal}</div>
-                     <small style="font-size:10px; display:block; text-align:right;">${m.time}</small>`;
+    div.innerHTML = `
+        <div style="display:flex; justify-content:space-between;">
+            <small><b>${m.sender_phone}</b></small>
+            ${iconeSuppr}
+        </div>
+        <div>${m.content || ''}</div>
+        <small style="font-size:10px; display:block; text-align:right; opacity:0.6;">${m.time}</small>`;
     
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
