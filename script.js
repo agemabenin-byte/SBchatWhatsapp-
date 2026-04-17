@@ -156,6 +156,7 @@ async function executeSendPrivate() {
     }
 }
 
+// --- MESSAGES PRIVÉS (INBOX) - MISE À JOUR AFFICHAGE ---
 async function loadInbox() {
     const box = document.getElementById('inbox-list');
     if(!box) return;
@@ -175,24 +176,28 @@ async function loadInbox() {
             const div = document.createElement('div');
             div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
             
-            // --- LOGIQUE DE DÉTECTION DE MÉDIA ---
-            let contentFinal = msg.content;
+            // --- LOGIQUE D'AFFICHAGE INTELLIGENTE ---
+            let messageAffiche = msg.content;
 
-            // Détection des Images
+            // 1. Détection des Images (JPG, PNG, WEBP)
             if (msg.content.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
-                contentFinal = msg.content.replace(/(https?:\/\/[^\s]+)/g, '<img src="$1" style="max-width:100%; border-radius:8px; display:block; margin-top:5px;">');
+                // On remplace le lien par une balise IMG
+                messageAffiche = msg.content.replace(/(https?:\/\/[^\s]+)/g, '<img src="$1" style="max-width:100%; border-radius:8px; display:block; margin-top:5px;">');
             } 
-            // Détection des Vidéos
-            else if (msg.content.match(/\.(mp4|mov|avi|wmv)/i)) {
-                contentFinal = msg.content.replace(/(https?:\/\/[^\s]+)/g, '<video controls style="max-width:100%; border-radius:8px; margin-top:5px;"><source src="$1" type="video/mp4"></video>');
+            // 2. Détection des Vidéos (MP4, MOV)
+            else if (msg.content.match(/\.(mp4|mov)/i)) {
+                // On remplace le lien par un lecteur VIDÉO
+                messageAffiche = msg.content.replace(/(https?:\/\/[^\s]+)/g, '<video controls style="max-width:100%; border-radius:8px; margin-top:5px;"><source src="$1" type="video/mp4"></video>');
             }
-            // Détection des fichiers lourds (ZIP, EXE, PDF)
+            // 3. Détection des autres fichiers joints (ZIP, EXE, PDF)
             else if (msg.content.includes("res.cloudinary.com")) {
-                contentFinal = msg.content.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:5px 10px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier</a>');
+                // On crée un bouton de téléchargement
+                messageAffiche = msg.content.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:5px 10px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier joint</a>');
             }
 
+            // On utilise .innerHTML pour activer les balises HTML qu'on vient de créer
             div.innerHTML = `<b>De: ${msg.sender_phone || 'Inconnu'}</b>
-                             <div style="margin:5px 0;">${contentFinal}</div>
+                             <div style="margin:5px 0;">${messageAffiche}</div>
                              <small>${msg.time}</small>`;
             box.appendChild(div);
         });
