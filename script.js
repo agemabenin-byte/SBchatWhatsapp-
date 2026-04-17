@@ -171,8 +171,26 @@ async function loadInbox() {
         data.forEach(msg => {
             const div = document.createElement('div');
             div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
-            // On utilise directement msg.sender_phone qui est maintenant stocké
-            div.innerHTML = `<b>De: ${msg.sender_phone || 'Inconnu'}</b><p style="margin:5px 0;">${msg.content}</p><small>${msg.time}</small>`;
+            
+            // --- LOGIQUE DE DÉTECTION DE MÉDIA ---
+            let contentFinal = msg.content;
+
+            // Détection des Images
+            if (msg.content.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
+                contentFinal = msg.content.replace(/(https?:\/\/[^\s]+)/g, '<img src="$1" style="max-width:100%; border-radius:8px; display:block; margin-top:5px;">');
+            } 
+            // Détection des Vidéos
+            else if (msg.content.match(/\.(mp4|mov|avi|wmv)/i)) {
+                contentFinal = msg.content.replace(/(https?:\/\/[^\s]+)/g, '<video controls style="max-width:100%; border-radius:8px; margin-top:5px;"><source src="$1" type="video/mp4"></video>');
+            }
+            // Détection des fichiers lourds (ZIP, EXE, PDF)
+            else if (msg.content.includes("res.cloudinary.com")) {
+                contentFinal = msg.content.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:5px 10px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier</a>');
+            }
+
+            div.innerHTML = `<b>De: ${msg.sender_phone || 'Inconnu'}</b>
+                             <div style="margin:5px 0;">${contentFinal}</div>
+                             <small>${msg.time}</small>`;
             box.appendChild(div);
         });
     } else { 
