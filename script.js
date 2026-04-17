@@ -157,6 +157,7 @@ async function executeSendPrivate() {
 }
 
 // --- MESSAGES PRIVÉS (INBOX) - MISE À JOUR AFFICHAGE ---
+// --- CHARGEMENT DE L'INBOX (AVEC CORBEILLE ADMIN) ---
 async function loadInbox() {
     const box = document.getElementById('inbox-list');
     if(!box) return;
@@ -174,28 +175,33 @@ async function loadInbox() {
     if(data && data.length > 0) {
         data.forEach(msg => {
             const div = document.createElement('div');
-            div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
+            // IMPORTANT : ID unique pour la suppression visuelle
+            div.id = `msg-inbox-${msg.id}`; 
+            div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: relative;";
             
             let messageAffiche = msg.content || "";
 
             // --- DÉTECTION INTELLIGENTE DES MÉDIAS ---
-            
-            // 1. Détection des Images (recherche l'extension n'importe où dans le lien)
             if (messageAffiche.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
                 messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<img src="$1" style="max-width:100%; border-radius:8px; display:block; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">');
             } 
-            // 2. Détection des Vidéos
             else if (messageAffiche.match(/\.(mp4|mov)/i)) {
                 messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<video controls style="max-width:100%; border-radius:8px; margin-top:5px;"><source src="$1" type="video/mp4"></video>');
             }
-            // 3. Détection des autres fichiers joints (Cloudinary mais pas image/vidéo)
             else if (messageAffiche.includes("res.cloudinary.com")) {
                 messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:8px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier joint</a>');
             }
 
-            div.innerHTML = `<b>De: ${msg.sender_phone || 'Inconnu'}</b>
-                             <div style="margin:5px 0; word-wrap: break-word;">${messageAffiche}</div>
-                             <small style="color:gray; font-size:10px;">${msg.time}</small>`;
+            // --- LOGIQUE DE LA CORBEILLE ---
+            const isAdmin = currentProfile && ADMINS_PHONES.includes(currentProfile.phone);
+            const iconeSuppr = isAdmin ? `<span onclick="supprimerMessageDefinitif('inbox', ${msg.id}, 'inbox')" style="cursor:pointer; color:red; position:absolute; top:10px; right:10px; font-size:18px;">🗑️</span>` : "";
+
+            div.innerHTML = `
+                ${iconeSuppr}
+                <b>De: ${msg.sender_phone || 'Inconnu'}</b>
+                <div style="margin:5px 0; word-wrap: break-word; padding-right: 25px;">${messageAffiche}</div>
+                <small style="color:gray; font-size:10px;">${msg.time}</small>
+            `;
             box.appendChild(div);
         });
     } else { 
