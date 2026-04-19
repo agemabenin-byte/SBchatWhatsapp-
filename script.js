@@ -624,7 +624,7 @@ async function supprimerMessage(id, table, publicId = null) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${sb_publishable_zvBTaDrffaATEPI7Wbu4OQ_w8ZR6chX}`
+                    'Authorization': `Bearer ${SUPABASE_KEY}`
                 },
                 body: JSON.stringify({ 
                     public_id: publicId,
