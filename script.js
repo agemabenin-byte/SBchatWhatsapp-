@@ -59,53 +59,6 @@ async function handleFileSelect() {
     if (file) await handleSend();
 }
 
-async function handleSend() {
-    if(currentProfile && currentProfile.is_banned) return alert("Banni !");
-    const input = document.getElementById('msgInput');
-    const fileInput = document.getElementById('file-input');
-    const content = input.value.trim();
-    const file = fileInput.files[0];
-    
-    let url = null;
-    let publicId = null;
-
-    if(!content && !file) return;
-
-    if(file) {
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('upload_preset', "chat_preset");
-            
-            const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
-                method: 'POST', body: formData
-            });
-            const data = await response.json();
-            
-            if(data.secure_url) {
-                url = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
-                publicId = data.public_id; // On récupère l'ID Cloudinary
-            }
-        } catch (err) { 
-            console.error(err); 
-            return alert("Erreur média."); 
-        }
-    }
-
-    await _supabase.from('messages').insert([{
-        sender_id: currentUser.id, 
-        sender_phone: currentProfile.phone,
-        content: content, 
-        image_url: url, 
-        media_public_id: publicId, // Sauvegarde de l'ID pour suppression future
-        reply_to_id: replyToId,
-        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
-    }]);
-
-    input.value = ""; 
-    fileInput.value = ""; 
-    cancelReply();
-}
 
 // Cette fonction gère tes boutons "Retour" (la flèche ⬅ dans ton HTML)
 function goBack() {
@@ -593,16 +546,69 @@ async function handleAdminFileSelect() {
     xhr.send(formData);
 }
 
+// --- FONCTION D'ENVOI (HANDLE SEND) ---
+async function handleSend() {
+    if(currentProfile && currentProfile.is_banned) return alert("Banni !");
+    const input = document.getElementById('msgInput');
+    const fileInput = document.getElementById('file-input');
+    const content = input.value.trim();
+    const file = fileInput.files[0];
+    
+    let url = null;
+    let publicId = null;
+
+    if(!content && !file) return;
+
+    if(file) {
+        try {
+            // DETERMINATION DU COMPTE : Vidéo ou Fichier lourd -> Compte Vidéos
+            const isLargeOrVideo = file.type.startsWith('video/') || file.size > 10 * 1024 * 1024;
+            const cloudName = isLargeOrVideo ? "dn3vf0mhm" : "dtkssnhub";
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', "chat_preset");
+            
+            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/upload`, {
+                method: 'POST', body: formData
+            });
+            const data = await response.json();
+            
+            if(data.secure_url) {
+                url = data.secure_url;
+                publicId = data.public_id; // Cet ID est vital pour la suppression
+            }
+        } catch (err) { 
+            console.error(err); 
+            return alert("Erreur d'upload."); 
+        }
+    }
+
+    // Insertion avec media_public_id
+    await _supabase.from('messages').insert([{
+        sender_id: currentUser.id, 
+        sender_phone: currentProfile.phone,
+        content: content, 
+        image_url: url, 
+        media_public_id: publicId, 
+        reply_to_id: replyToId,
+        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+    }]);
+
+    input.value = ""; 
+    fileInput.value = ""; 
+    cancelReply();
+}
+
+// --- FONCTION DE SUPPRESSION (SUPPRIMER MESSAGE) ---
 async function supprimerMessage(id, table, publicId = null) {
     if (!confirm("Supprimer définitivement ce message et son média ?")) return;
 
-    if (publicId && publicId !== "null" && publicId !== "") {
+    // Suppression Cloudinary (uniquement si on a un ID)
+    if (publicId && publicId !== "null" && publicId !== "" && publicId !== "undefined") {
         try {
-            // Détection si c'est une vidéo ou un fichier lourd (ton 2ème compte)
-            // On vérifie l'extension ou si le publicId contient un indice
-            const isVideo = publicId.match(/\.(mp4|mov|pdf|zip)$/i); 
-            
-            // On décide quel compte cibler
+            // On détecte le compte selon le type de média
+            const isVideo = publicId.match(/\.(mp4|mov|avi)$/i); 
             const targetAccount = isVideo ? "videos" : "photos";
 
             await fetch('https://jukfjoljkaoeicopjuwo.supabase.co/functions/v1/delete-cloudinary-media', {
@@ -614,23 +620,21 @@ async function supprimerMessage(id, table, publicId = null) {
                 body: JSON.stringify({ 
                     public_id: publicId,
                     resource_type: isVideo ? "video" : "image",
-                    account: targetAccount // On envoie l'info du compte à la Edge Function
+                    account: targetAccount
                 })
             });
-            console.log(`Média supprimé du compte ${targetAccount} :`, publicId);
         } catch (err) {
-            console.error("Erreur suppression Cloudinary:", err);
+            console.error("Erreur Cloudinary:", err);
         }
     }
 
+    // Suppression Supabase
     const { error } = await _supabase.from(table).delete().eq('id', id);
-
     if (error) {
-        alert("Erreur DB : " + error.message);
+        alert("Erreur DB");
     } else {
         alert("Message et média supprimés !");
-        if (table === 'messages') loadChat(); 
-        else loadInbox();
+        table === 'messages' ? loadChat() : loadInbox();
     }
 }
 
