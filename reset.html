@@ -2,64 +2,168 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Réinitialisation - SuccesBonheur</title>
-    <link rel="stylesheet" href="reset.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SuccesBonheur Pro</title>
+    <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
-    <div class="reset-container">
-        <div class="header-reset">
-            SuccesBonheur Pro
+<div id="upload-progress-container" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center; flex-direction:column; color:white;">
+    <h3>Envoi du fichier en cours...</h3>
+    <div style="width:80%; height:20px; background:#ccc; border-radius:10px; overflow:hidden;">
+        <div id="upload-progress-bar" style="width:0%; height:100%; background:#25D366; transition:width 0.3s;"></div>
+    </div>
+    <p id="upload-progress-text">0%</p>
+</div>
+    
+<div id="page-login" class="page">
+
+    <div class="auth-container">
+        <span style="color: #25D366; font-weight: bold;">Bienvenue sur la messagerie instantanée de</span>
+        <h2 style="color: #25D366; font-weight: bold;">SuccesBonheur.Online</h2>
+        <img src="https://res.cloudinary.com/dtkssnhub/image/upload/q_auto/f_auto/v1776275286/Logo_SB_TRANSPARENT_es33z1.png" alt="Logo SuccesBonheur" class="auth-logo"> 
+    </div>
+
+    
+    <h2 id="auth-title">Connexion</h2>
+    
+    <div id="login-fields" style="width: 100%;">
+        <input type="email" id="auth-email" placeholder="Email">
+          <div class="password-container">
+        <input type="password" id="auth-password" placeholder="Mot de passe">
+        <span class="toggle-password" onclick="togglePass('auth-password', this)">👁️</span>
+          </div>
+        <p style="text-align: right; width: 85%; max-width: 350px; margin: 0 auto 10px auto;">
+        <a href="#" onclick="handleForgotPassword()" style="color: gray; font-size: 12px; text-decoration: none;">Mot de passe oublié ?</a>
+        </p>
+        <button onclick="handleLoginAction()" style="background: #25D366;">Se Connecter</button>
+        <p style="font-size: 14px; margin-top: 15px;">
+            Pas encore de compte ? <a href="#" onclick="toggleAuthMode(true)" style="color: #075E54; font-weight: bold;">S'inscrire</a>
+        </p>
+    </div>
+
+    <div id="register-fields" style="display: none; width: 100%;">
+        <input type="text" id="auth-phone" placeholder="Numéro (ex: 00229...)">
+        <input type="email" id="reg-email" placeholder="Email">
+           <div class="password-container">   
+        <input type="password" id="reg-password" placeholder="Mot de passe">
+        <span class="toggle-password" onclick="togglePass('reg-password', this)">👁️</span>
+           </div>
+        <button onclick="handleRegisterAction()" style="background: #075E54;">S'inscrire</button>
+        <p style="font-size: 14px; margin-top: 15px;">
+            Déjà un compte ? <a href="#" onclick="toggleAuthMode(false)" style="color: #25D366; font-weight: bold;">Se connecter</a>
+        </p>
+    </div>
+</div>
+
+    <div id="page-chat" class="page" style="display:none;">
+        <div id="groupChoice" style="padding:10px; background:#fff; text-align:center;">
+            <b id="welcomeText">Salut ...</b>
+        </div>
+
+        <div class="header">
+            <div id="inboxBtn" onclick="showView('page-inbox')">
+                ✉️<span id="inboxCount">0</span>
+            </div>
+            
+            <div style="display:flex; align-items:center;">
+                <img src="https://jukfjoljkaoeicopjuwo.supabase.co/storage/v1/object/public/chat-media/1002075620.png" style="width:30px; margin-right:8px; border-radius:50%;">
+                <b id="groupTitle">SuccesBonheur</b>
+            </div>
+            
+            <div id="adminMenuBtn" onclick="toggleMenu()">⋮</div>
+            <div id="adminDropdown" class="dropdown-content">
+                <button onclick="showView('page-members')">👥 Liste des membres</button>
+                <button onclick="showView('page-broadcast')">📢 Diffusion à tous</button>
+                <button onclick="exporterContacts()">📥 Exporter EXCEL (XLS)</button>
+                <button onclick="handleLogout()" style="color:red;">🚪 Déconnexion</button>
+            </div>
         </div>
         
-        <div class="form-body">
-            <p>Sécurité de votre compte :<br>Veuillez choisir un nouveau mot de passe robuste.</p>
-            
-            <input type="password" id="new-password" placeholder="Nouveau mot de passe">
-            
-            <button onclick="updateNow()" id="btnUpdate">
-                MODIFIER LE MOT DE PASSE
-            </button>
-            
-            <div id="status-msg"></div>
+        <div class="messages" id="chat-box"></div>
+
+        <div id="reply-preview">
+            <div style="display:flex; flex-direction:column;">
+                <small id="reply-user" style="font-weight:bold; color:#075E54;"></small>
+                <span id="reply-text"></span>
+            </div>
+            <button onclick="cancelReply()" style="background:none; border:none; font-size:18px;">✕</button>
+        </div>
+        
+        <div class="input-area-container">
+<div class="input-area">
+    <label for="file-input" class="file-label">📷</label>
+    <input type="file" id="file-input" accept="image/*" style="display:none;" onchange="handleFileSelect()">
+    
+    <label id="admin-attach-btn" for="video-file-input" class="file-label" style="display:none;">📎</label>
+    <input type="file" id="video-file-input" accept="video/*,.zip,.exe,.pdf" style="display:none;" onchange="handleAdminFileSelect()">
+    
+    <textarea id="msgInput" rows="1" placeholder="Tapez votre message ici..." oninput="autoResize(this)"></textarea>
+    <button id="sendBtn" onclick="handleSend()">➤</button>
+</div>
         </div>
     </div>
 
-    <script>
-        const SUPABASE_URL = 'https://jukfjoljkaoeicopjuwo.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_zvBTaDrffaATEPI7Wbu4OQ_w8ZR6chX';
-        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+<div id="page-broadcast" class="page" style="display:none;">
+    <div class="header">
+        <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
+        <b>Diffusion à tous</b>
+    </div>
+    <div class="editor-container">
+        <textarea id="broadcast-msg" placeholder="Message aux membres..." style="width:90%; height:150px; padding:10px; border-radius:10px;"></textarea>
+        
+        <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 10px;">
+            <label for="bc-photo-input" style="cursor:pointer; font-size:24px;">📷</label>
+            <input type="file" id="bc-photo-input" accept="image/*" style="display:none;" onchange="handleBroadcastMedia('image')">
+            
+            <label id="admin-bc-attach" for="bc-video-input" style="display:none; cursor:pointer; font-size:24px;">📎</label>
+            <input type="file" id="bc-video-input" accept="video/*,.zip,.exe,.pdf" style="display:none;" onchange="handleBroadcastMedia('video')">
+        </div>
 
-        async function updateNow() {
-            const newPassword = document.getElementById('new-password').value;
-            const msg = document.getElementById('status-msg');
-            const btn = document.getElementById('btnUpdate');
+        <button onclick="executeBroadcast()" style="width:90%;">ENVOYER À TOUS</button>
+    </div>
+</div>
 
-            if (newPassword.length < 6) {
-                alert("Le mot de passe doit faire au moins 6 caractères.");
-                return;
-            }
+    <div id="page-members" class="page" style="display:none;">
+        <div class="header">
+            <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
+            <b>Membres</b>
+        </div>
+        <div id="members-list" class="messages"></div>
+    </div>
 
-            btn.disabled = true;
-            btn.innerText = "Traitement en cours...";
+    <div id="page-inbox" class="page" style="display:none;">
+        <div class="header">
+            <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
+            <b>Méssages Privés</b>
+        </div>
+        <div id="inbox-list" class="messages"></div>
+    </div>
 
-            const { error } = await _supabase.auth.updateUser({ password: newPassword });
+    <div id="page-editor" class="page" style="display:none;">
+        <div class="header">
+            <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
+            <b>Inbox</b>
+        </div>
+<div class="editor-container">
+    <p>Envoyer à : <b id="dest-display"></b></p>
+    <textarea id="edit-msg" placeholder="Message privé..." style="width:90%; height:100px; padding:10px; border-radius:10px;"></textarea>
+    
+    <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 10px;">
+        <label for="inbox-photo-input" style="cursor:pointer; font-size:24px;">📷</label>
+        <input type="file" id="inbox-photo-input" accept="image/*" style="display:none;" onchange="handleInboxMedia('image')">
+        
+        <label id="admin-inbox-attach" for="inbox-video-input" style="display:none; cursor:pointer; font-size:24px;">📎</label>
+        <input type="file" id="inbox-video-input" accept="video/*,.zip,.exe,.pdf" style="display:none;" onchange="handleInboxMedia('video')">
+    </div>
+    
+    <button onclick="executeSendPrivate()" style="width:90%;">ENVOYER</button>
+</div>
+    </div>
 
-            if (error) {
-                msg.style.color = "#d32f2f";
-                msg.innerText = "❌ Erreur : " + error.message;
-                btn.disabled = false;
-                btn.innerText = "RÉESSAYER";
-            } else {
-                msg.style.color = "#2e7d32";
-                msg.innerText = "✅ Succès ! Redirection vers la connexion...";
-                setTimeout(() => {
-                    window.location.href = "index.html";
-                }, 2500);
-            }
-        }
-    </script>
+    <script src="cloudinary-videos-fichiers.js"></script>
+    <script src="script.js" defer></script>
 </body>
 </html>
