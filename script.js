@@ -596,42 +596,43 @@ async function handleAdminFileSelect() {
 async function supprimerMessage(id, table, publicId = null) {
     if (!confirm("Supprimer définitivement ce message et son média ?")) return;
 
-    // 1. Si un ID média existe, on appelle l'Edge Function pour nettoyer Cloudinary
     if (publicId && publicId !== "null" && publicId !== "") {
         try {
-            // Détection automatique du type (image ou vidéo)
-            const isVideo = publicId.match(/\.(mp4|mov)$/i); 
+            // Détection si c'est une vidéo ou un fichier lourd (ton 2ème compte)
+            // On vérifie l'extension ou si le publicId contient un indice
+            const isVideo = publicId.match(/\.(mp4|mov|pdf|zip)$/i); 
             
+            // On décide quel compte cibler
+            const targetAccount = isVideo ? "videos" : "photos";
+
             await fetch('https://jukfjoljkaoeicopjuwo.supabase.co/functions/v1/delete-cloudinary-media', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${SUPABASE_KEY}` // Utilise ta clé publishable
+                    'Authorization': `Bearer ${SUPABASE_KEY}`
                 },
                 body: JSON.stringify({ 
                     public_id: publicId,
-                    resource_type: isVideo ? "video" : "image"
+                    resource_type: isVideo ? "video" : "image",
+                    account: targetAccount // On envoie l'info du compte à la Edge Function
                 })
             });
-            console.log("Média supprimé du Cloud :", publicId);
+            console.log(`Média supprimé du compte ${targetAccount} :`, publicId);
         } catch (err) {
             console.error("Erreur suppression Cloudinary:", err);
-            // On continue quand même pour supprimer le message de la base
         }
     }
 
-    // 2. Suppression dans Supabase
     const { error } = await _supabase.from(table).delete().eq('id', id);
 
     if (error) {
         alert("Erreur DB : " + error.message);
     } else {
-        alert("Message et média supprimés avec succès !");
+        alert("Message et média supprimés !");
         if (table === 'messages') loadChat(); 
         else loadInbox();
     }
 }
-
 
 // 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
 // C'est cette ligne qui empêche le retour forcé au login lors d'un rafraîchissement !
