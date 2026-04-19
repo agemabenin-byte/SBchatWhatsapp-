@@ -572,52 +572,65 @@ async function handleSend() {
 
     if(file) {
         try {
-            // --- CHOIX DU COMPTE ---
-            // Vidéo ou fichier > 10Mo -> Compte dn3vf0mhm, sinon dtkssnhub
-            const isLarge = file.type.startsWith('video/') || file.size > 10 * 1024 * 1024;
+            // 1. On détermine le type exact et le compte
+            const isVideo = file.type.startsWith('video/');
+            const isLarge = isVideo || file.size > 10 * 1024 * 1024;
             const cloudName = isLarge ? "dn3vf0mhm" : "dtkssnhub";
+            const resourceType = isVideo ? "video" : "image"; // TRÈS IMPORTANT
 
             const formData = new FormData();
             formData.append('file', file);
             formData.append('upload_preset', "chat_preset");
             
-            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/upload`, {
+            // 2. On précise le resourceType dans l'URL
+            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
                 method: 'POST', body: formData
             });
+            
             const data = await response.json();
             
             if(data.secure_url) {
                 url = data.secure_url;
-                publicId = data.public_id; // On récupère l'ID pour la future suppression
+                publicId = data.public_id; 
+                console.log("Upload réussi, ID:", publicId);
+            } else {
+                console.error("Réponse Cloudinary sans URL:", data);
+                return alert("Erreur lors de l'upload du média.");
             }
         } catch (err) { 
-            console.error(err); 
-            return alert("Erreur d'envoi média."); 
+            console.error("Erreur Fetch Cloudinary:", err); 
+            return alert("Connexion au serveur de média échouée."); 
         }
     }
 
-    await _supabase.from('messages').insert([{
+    // 3. Insertion finale (On s'assure que publicId n'est pas nul ici)
+    const { error } = await _supabase.from('messages').insert([{
         sender_id: currentUser.id, 
         sender_phone: currentProfile.phone,
         content: content, 
         image_url: url, 
-        media_public_id: publicId, // On enregistre l'ID dans Supabase
+        media_public_id: publicId, 
         reply_to_id: replyToId,
         time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
     }]);
 
-    input.value = ""; 
-    fileInput.value = ""; 
-    cancelReply();
+    if (error) {
+        console.error("Erreur Supabase:", error);
+    } else {
+        input.value = ""; 
+        fileInput.value = ""; 
+        cancelReply();
+    }
 }
 
 async function supprimerMessage(id, table, publicId = null) {
     if (!confirm("Supprimer définitivement ce message et son média ?")) return;
 
-    if (publicId && publicId !== "null" && publicId !== "" && publicId !== "undefined") {
+    if (publicId && publicId !== "null" && publicId !== "") {
         try {
-            // Détection du type pour choisir le compte
-            const isVideo = publicId.match(/\.(mp4|mov|avi|pdf|zip)$/i) || publicId.includes('video'); 
+            // Si l'URL contient "video", c'est le compte dn3vf0mhm
+            // Sinon c'est dtkssnhub
+            const isVideo = publicId.includes('video') || publicId.match(/video/i);
             const targetAccount = isVideo ? "videos" : "photos";
 
             await fetch('https://jukfjoljkaoeicopjuwo.supabase.co/functions/v1/delete-cloudinary-media', {
@@ -632,7 +645,6 @@ async function supprimerMessage(id, table, publicId = null) {
                     account: targetAccount 
                 })
             });
-            console.log("Média supprimé du cloud:", targetAccount);
         } catch (err) {
             console.error("Erreur suppression Cloudinary:", err);
         }
