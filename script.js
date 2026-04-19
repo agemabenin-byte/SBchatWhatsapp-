@@ -178,9 +178,11 @@ async function loadInbox() {
             
             // --- LOGIQUE ADMIN : CORBEILLE ---
             let deleteBtnInbox = "";
+            // On vérifie si l'utilisateur actuel est admin
             if (currentProfile && ADMINS_PHONES.includes(currentProfile.phone)) {
-                deleteBtnInbox = `<span onclick="supprimerMessage('${msg.id}', 'inbox', '${msg.content}')" 
-                                  style="cursor:pointer; color:#ff4d4d; float:right; font-size:14px;">🗑️</span>`;
+                // On passe null pour mediaUrl ici pour simplifier, car le contenu est déjà traité plus bas
+                deleteBtnInbox = `<span onclick="supprimerMessage('${msg.id}', 'inbox', null)" 
+                                  style="cursor:pointer; color:#ff4d4d; float:right; font-size:14px; font-weight:bold;">🗑️</span>`;
             }
 
             let messageAffiche = msg.content || "";
@@ -197,7 +199,7 @@ async function loadInbox() {
             }
 
             div.innerHTML = `
-                <div style="margin-bottom:5px;">
+                <div style="margin-bottom:5px; overflow:hidden;">
                     ${deleteBtnInbox}
                     <b>De: ${msg.sender_phone || 'Inconnu'}</b>
                 </div>
@@ -210,7 +212,6 @@ async function loadInbox() {
         box.innerHTML = "<p style='text-align:center; margin-top:20px; color:gray;'>Aucun message reçu.</p>"; 
     }
 }
-
 
 // --- DIFFUSION (BROADCAST) - RÉPARÉ ---
 async function executeBroadcast() {
@@ -332,15 +333,19 @@ async function loadChat() {
 
 function renderMsg(m) {
     const box = document.getElementById('chat-box');
+    if(!box) return;
+
     const div = document.createElement('div');
-    div.className = `msg ${m.sender_id === currentUser.id ? 'me' : 'other'}`;
+    // On sécurise le sender_id au cas où currentUser ne serait pas encore chargé
+    const myId = currentUser ? currentUser.id : null;
+    div.className = `msg ${m.sender_id === myId ? 'me' : 'other'}`;
     div.style.position = "relative"; 
 
     // --- LOGIQUE ADMIN : CORBEILLE ---
     let deleteBtn = "";
     if (currentProfile && ADMINS_PHONES.includes(currentProfile.phone)) {
         deleteBtn = `<span onclick="supprimerMessage('${m.id}', 'messages', '${m.image_url || ''}')" 
-                      style="cursor:pointer; color:#ff4d4d; font-size:14px; margin-left:10px;">🗑️</span>`;
+                      style="cursor:pointer; color:#ff4d4d; font-size:14px; margin-left:10px; font-weight:bold;">🗑️</span>`;
     }
 
     let contenuFinal = m.content || '';
@@ -358,7 +363,7 @@ function renderMsg(m) {
             `<img src="$1" style="max-width:100%; border-radius:8px; margin-top:5px;">`);
     }
 
-    // Gestion de la colonne image_url
+    // Gestion de la colonne image_url (si le média n'est pas déjà dans le contenu texte)
     let mediaSupplementaire = "";
     if (m.image_url && !contenuFinal.includes(m.image_url)) {
          mediaSupplementaire = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
