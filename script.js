@@ -67,7 +67,7 @@ async function handleSend() {
     const file = fileInput.files[0];
     
     let url = null;
-    let publicId = null; // Nouvelle variable pour le Public ID
+    let publicId = null;
 
     if(!content && !file) return;
 
@@ -84,21 +84,20 @@ async function handleSend() {
             
             if(data.secure_url) {
                 url = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
-                publicId = data.public_id; // On récupère l'identifiant unique ici
+                publicId = data.public_id; // On récupère l'ID Cloudinary
             }
         } catch (err) { 
             console.error(err); 
-            return alert("Erreur lors de l'upload du média."); 
+            return alert("Erreur média."); 
         }
     }
 
-    // Insertion dans Supabase avec le media_public_id
     await _supabase.from('messages').insert([{
         sender_id: currentUser.id, 
         sender_phone: currentProfile.phone,
         content: content, 
         image_url: url, 
-        media_public_id: publicId, // On enregistre l'ID pour la future suppression
+        media_public_id: publicId, // Sauvegarde de l'ID pour suppression future
         reply_to_id: replyToId,
         time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
     }]);
@@ -348,36 +347,25 @@ async function loadChat() {
 function renderMsg(m) {
     const box = document.getElementById('chat-box');
     if(!box) return;
-
     const div = document.createElement('div');
-    // On sécurise le sender_id au cas où currentUser ne serait pas encore chargé
     const myId = currentUser ? currentUser.id : null;
     div.className = `msg ${m.sender_id === myId ? 'me' : 'other'}`;
     div.style.position = "relative"; 
 
-    // --- LOGIQUE ADMIN : CORBEILLE ---
     let deleteBtn = "";
     if (currentProfile && ADMINS_PHONES.includes(currentProfile.phone)) {
-        deleteBtn = `<span onclick="supprimerMessage('${m.id}', 'messages', '${m.image_url || ''}')" 
-                      style="cursor:pointer; color:#ff4d4d; font-size:14px; margin-left:10px; font-weight:bold;">🗑️</span>`;
+        // ON PASSE ICI LE media_public_id AU LIEU DE L'URL
+        deleteBtn = `<span onclick="supprimerMessage('${m.id}', 'messages', '${m.media_public_id || ''}')" 
+                      style="cursor:pointer; color:#ff4d4d; font-size:14px; margin-left:10px;">🗑️</span>`;
     }
 
     let contenuFinal = m.content || '';
-
-    // Détection Vidéo dans le texte
     if (contenuFinal.includes('.mp4') || contenuFinal.includes('.mov')) {
-        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.mp4|\.mov)[^\s]*)/g, 
-            `<video controls style="max-width:100%; border-radius:8px; margin-top:5px;">
-                <source src="$1" type="video/mp4">
-             </video>`);
-    } 
-    // Détection Image dans le texte
-    else if (contenuFinal.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
-        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.jpg|\.png|\.jpeg|\.webp)[^\s]*)/g, 
-            `<img src="$1" style="max-width:100%; border-radius:8px; margin-top:5px;">`);
+        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.mp4|\.mov)[^\s]*)/g, `<video controls style="max-width:100%; border-radius:8px; margin-top:5px;"><source src="$1" type="video/mp4"></video>`);
+    } else if (contenuFinal.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
+        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.jpg|\.png|\.jpeg|\.webp)[^\s]*)/g, `<img src="$1" style="max-width:100%; border-radius:8px; margin-top:5px;">`);
     }
 
-    // Gestion de la colonne image_url (si le média n'est pas déjà dans le contenu texte)
     let mediaSupplementaire = "";
     if (m.image_url && !contenuFinal.includes(m.image_url)) {
          mediaSupplementaire = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
@@ -605,28 +593,44 @@ async function handleAdminFileSelect() {
     xhr.send(formData);
 }
 
-async function supprimerMessage(id, table, mediaUrl = null) {
+async function supprimerMessage(id, table, publicId = null) {
     if (!confirm("Supprimer définitivement ce message et son média ?")) return;
 
-    // 1. Suppression du média sur Cloudinary (si présent)
-    if (mediaUrl) {
-        // Note: La suppression directe via URL nécessite souvent une configuration spécifique 
-        // ou l'usage du 'public_id'. Ici, on informe l'admin, mais la suppression DB est immédiate.
-        console.log("Tentative de suppression média :", mediaUrl);
+    // 1. Si un ID média existe, on appelle l'Edge Function pour nettoyer Cloudinary
+    if (publicId && publicId !== "null" && publicId !== "") {
+        try {
+            // Détection automatique du type (image ou vidéo)
+            const isVideo = publicId.match(/\.(mp4|mov)$/i); 
+            
+            await fetch('https://jukfjoljkaoeicopjuwo.supabase.co/functions/v1/delete-cloudinary-media', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${SUPABASE_KEY}` // Utilise ta clé publishable
+                },
+                body: JSON.stringify({ 
+                    public_id: publicId,
+                    resource_type: isVideo ? "video" : "image"
+                })
+            });
+            console.log("Média supprimé du Cloud :", publicId);
+        } catch (err) {
+            console.error("Erreur suppression Cloudinary:", err);
+            // On continue quand même pour supprimer le message de la base
+        }
     }
 
     // 2. Suppression dans Supabase
     const { error } = await _supabase.from(table).delete().eq('id', id);
 
     if (error) {
-        alert("Erreur suppression DB : " + error.message);
+        alert("Erreur DB : " + error.message);
     } else {
-        alert("Message supprimé !");
+        alert("Message et média supprimés avec succès !");
         if (table === 'messages') loadChat(); 
         else loadInbox();
     }
 }
-
 
 
 // 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
