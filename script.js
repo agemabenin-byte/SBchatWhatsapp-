@@ -479,16 +479,26 @@ async function handleInboxMedia(type) {
 
 function gererAffichageAdmin(userPhone) {
     if (ADMINS_PHONES.includes(userPhone)) {
-        // On affiche les trombones pour l'admin
+        // 1. Les icônes de pièces jointes (trombonnes)
         const attachGroup = document.getElementById('admin-attach-btn');
         const attachBC = document.getElementById('admin-bc-attach');
         const attachInbox = document.getElementById('admin-inbox-attach');
+        
+        // 2. Les menus d'administration
         const menuBtn = document.getElementById('adminMenuBtn');
+        const exportBtn = document.getElementById('admin-export-btn');
+        const broadcastBtn = document.getElementById('admin-broadcast-btn');
 
+        // Affichage
         if (attachGroup) attachGroup.style.display = 'inline-block';
         if (attachBC) attachBC.style.display = 'inline-block';
         if (attachInbox) attachInbox.style.display = 'inline-block';
-        if (menuBtn) menuBtn.style.display = 'block'; // S'assure que le menu ⋮ est visible
+        
+        if (menuBtn) menuBtn.style.display = 'block';
+        if (exportBtn) exportBtn.style.display = 'block';
+        if (broadcastBtn) broadcastBtn.style.display = 'block';
+        
+        console.log("Mode Admin activé pour :", userPhone);
     }
 }
 
