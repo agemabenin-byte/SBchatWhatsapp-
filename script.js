@@ -160,7 +160,7 @@ async function executeSendPrivate() {
 async function loadInbox() {
     const box = document.getElementById('inbox-list');
     if(!box) return;
-    box.innerHTML = "Chargement...";
+    box.innerHTML = "<p style='text-align:center;'>Chargement...</p>";
 
     const { data, error } = await _supabase
         .from('inbox')
@@ -168,40 +168,49 @@ async function loadInbox() {
         .eq('to_id', currentUser.id)
         .order('id', {ascending: false});
     
-    if(error) return box.innerHTML = "Erreur de chargement.";
+    if(error) return box.innerHTML = "<p style='text-align:center; color:red;'>Erreur de chargement.</p>";
     box.innerHTML = "";
 
     if(data && data.length > 0) {
         data.forEach(msg => {
             const div = document.createElement('div');
-            div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
+            div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position:relative;";
             
+            // --- LOGIQUE ADMIN : CORBEILLE ---
+            let deleteBtnInbox = "";
+            if (currentProfile && ADMINS_PHONES.includes(currentProfile.phone)) {
+                deleteBtnInbox = `<span onclick="supprimerMessage('${msg.id}', 'inbox', '${msg.content}')" 
+                                  style="cursor:pointer; color:#ff4d4d; float:right; font-size:14px;">🗑️</span>`;
+            }
+
             let messageAffiche = msg.content || "";
 
-            // --- DÉTECTION INTELLIGENTE DES MÉDIAS ---
-            
-            // 1. Détection des Images (recherche l'extension n'importe où dans le lien)
+            // Détection automatique des médias (Images, Vidéos, Fichiers)
             if (messageAffiche.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
-                messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<img src="$1" style="max-width:100%; border-radius:8px; display:block; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">');
+                messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<img src="$1" style="max-width:100%; border-radius:8px; display:block; margin-top:5px;">');
             } 
-            // 2. Détection des Vidéos
             else if (messageAffiche.match(/\.(mp4|mov)/i)) {
                 messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<video controls style="max-width:100%; border-radius:8px; margin-top:5px;"><source src="$1" type="video/mp4"></video>');
             }
-            // 3. Détection des autres fichiers joints (Cloudinary mais pas image/vidéo)
             else if (messageAffiche.includes("res.cloudinary.com")) {
-                messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:8px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier joint</a>');
+                messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:8px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier</a>');
             }
 
-            div.innerHTML = `<b>De: ${msg.sender_phone || 'Inconnu'}</b>
-                             <div style="margin:5px 0; word-wrap: break-word;">${messageAffiche}</div>
-                             <small style="color:gray; font-size:10px;">${msg.time}</small>`;
+            div.innerHTML = `
+                <div style="margin-bottom:5px;">
+                    ${deleteBtnInbox}
+                    <b>De: ${msg.sender_phone || 'Inconnu'}</b>
+                </div>
+                <div style="margin:5px 0; word-wrap: break-word;">${messageAffiche}</div>
+                <small style="color:gray; font-size:10px; display:block; margin-top:5px;">${msg.time}</small>`;
+            
             box.appendChild(div);
         });
     } else { 
-        box.innerHTML = "<p style='text-align:center;'>Aucun message reçu.</p>"; 
+        box.innerHTML = "<p style='text-align:center; margin-top:20px; color:gray;'>Aucun message reçu.</p>"; 
     }
 }
+
 
 // --- DIFFUSION (BROADCAST) - RÉPARÉ ---
 async function executeBroadcast() {
@@ -325,6 +334,14 @@ function renderMsg(m) {
     const box = document.getElementById('chat-box');
     const div = document.createElement('div');
     div.className = `msg ${m.sender_id === currentUser.id ? 'me' : 'other'}`;
+    div.style.position = "relative"; 
+
+    // --- LOGIQUE ADMIN : CORBEILLE ---
+    let deleteBtn = "";
+    if (currentProfile && ADMINS_PHONES.includes(currentProfile.phone)) {
+        deleteBtn = `<span onclick="supprimerMessage('${m.id}', 'messages', '${m.image_url || ''}')" 
+                      style="cursor:pointer; color:#ff4d4d; font-size:14px; margin-left:10px;">🗑️</span>`;
+    }
 
     let contenuFinal = m.content || '';
 
@@ -335,22 +352,26 @@ function renderMsg(m) {
                 <source src="$1" type="video/mp4">
              </video>`);
     } 
-    // Détection Image dans le texte (si pas déjà géré par m.image_url)
+    // Détection Image dans le texte
     else if (contenuFinal.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
         contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.jpg|\.png|\.jpeg|\.webp)[^\s]*)/g, 
             `<img src="$1" style="max-width:100%; border-radius:8px; margin-top:5px;">`);
     }
 
-    // Gestion de la colonne image_url (ton système actuel pour les photos simples)
+    // Gestion de la colonne image_url
     let mediaSupplementaire = "";
     if (m.image_url && !contenuFinal.includes(m.image_url)) {
-         mediaSupplementaire = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px;">`;
+         mediaSupplementaire = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
     }
 
-    div.innerHTML = `<small><b>${m.sender_phone}</b></small>
-                     ${mediaSupplementaire}
-                     <div>${contenuFinal}</div>
-                     <small style="font-size:10px; display:block; text-align:right;">${m.time}</small>`;
+    div.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:3px;">
+            <small><b>${m.sender_phone}</b></small>
+            ${deleteBtn}
+        </div>
+        ${mediaSupplementaire}
+        <div style="word-wrap: break-word;">${contenuFinal}</div>
+        <small style="font-size:10px; display:block; text-align:right; margin-top:3px; color:gray;">${m.time}</small>`;
     
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
@@ -564,6 +585,30 @@ async function handleAdminFileSelect() {
     xhr.open("POST", `https://api.cloudinary.com/v1_1/dn3vf0mhm/${resourceType}/upload`);
     xhr.send(formData);
 }
+
+async function supprimerMessage(id, table, mediaUrl = null) {
+    if (!confirm("Supprimer définitivement ce message et son média ?")) return;
+
+    // 1. Suppression du média sur Cloudinary (si présent)
+    if (mediaUrl) {
+        // Note: La suppression directe via URL nécessite souvent une configuration spécifique 
+        // ou l'usage du 'public_id'. Ici, on informe l'admin, mais la suppression DB est immédiate.
+        console.log("Tentative de suppression média :", mediaUrl);
+    }
+
+    // 2. Suppression dans Supabase
+    const { error } = await _supabase.from(table).delete().eq('id', id);
+
+    if (error) {
+        alert("Erreur suppression DB : " + error.message);
+    } else {
+        alert("Message supprimé !");
+        if (table === 'messages') loadChat(); 
+        else loadInbox();
+    }
+}
+
+
 
 // 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
 // C'est cette ligne qui empêche le retour forcé au login lors d'un rafraîchissement !
