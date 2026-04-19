@@ -300,28 +300,39 @@ async function loadChat() {
 function renderMsg(m) {
     const box = document.getElementById('chat-box');
     if(!box) return;
+    
     const div = document.createElement('div');
     const myId = currentUser ? currentUser.id : null;
     div.className = `msg ${m.sender_id === myId ? 'me' : 'other'}`;
     div.style.position = "relative"; 
 
+    // Bouton de suppression : on passe bien l'ID média pour Cloudinary
     let deleteBtn = "";
     if (currentProfile && ADMINS_PHONES.includes(currentProfile.phone)) {
-        // ON PASSE ICI LE media_public_id AU LIEU DE L'URL
         deleteBtn = `<span onclick="supprimerMessage('${m.id}', 'messages', '${m.media_public_id || ''}')" 
                       style="cursor:pointer; color:#ff4d4d; font-size:14px; margin-left:10px;">🗑️</span>`;
     }
 
     let contenuFinal = m.content || '';
-    if (contenuFinal.includes('.mp4') || contenuFinal.includes('.mov')) {
-        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.mp4|\.mov)[^\s]*)/g, `<video controls style="max-width:100%; border-radius:8px; margin-top:5px;"><source src="$1" type="video/mp4"></video>`);
-    } else if (contenuFinal.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
-        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.jpg|\.png|\.jpeg|\.webp)[^\s]*)/g, `<img src="$1" style="max-width:100%; border-radius:8px; margin-top:5px;">`);
+
+    // 1. Détection des Vidéos (plus robuste pour Cloudinary)
+    if (contenuFinal.match(/\.(mp4|mov|avi|wmv)/i) || contenuFinal.includes('/video/upload/')) {
+        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+)/g, `<video controls style="max-width:100%; border-radius:8px; margin-top:5px;"><source src="$1" type="video/mp4"></video>`);
+    } 
+    // 2. Détection des Images
+    else if (contenuFinal.match(/\.(jpeg|jpg|gif|png|webp)/i) || contenuFinal.includes('/image/upload/')) {
+        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+)/g, `<img src="$1" style="max-width:100%; border-radius:8px; margin-top:5px;">`);
     }
 
+    // 3. Gestion du média attaché (image_url) s'il n'est pas déjà dans le texte
     let mediaSupplementaire = "";
     if (m.image_url && !contenuFinal.includes(m.image_url)) {
-         mediaSupplementaire = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
+        // Si l'URL contient "video", on affiche un lecteur, sinon une image
+        if (m.image_url.includes('/video/upload/')) {
+            mediaSupplementaire = `<video controls style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;"><source src="${m.image_url}" type="video/mp4"></video>`;
+        } else {
+            mediaSupplementaire = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
+        }
     }
 
     div.innerHTML = `
@@ -561,9 +572,10 @@ async function handleSend() {
 
     if(file) {
         try {
-            // DETERMINATION DU COMPTE : Vidéo ou Fichier lourd -> Compte Vidéos
-            const isLargeOrVideo = file.type.startsWith('video/') || file.size > 10 * 1024 * 1024;
-            const cloudName = isLargeOrVideo ? "dn3vf0mhm" : "dtkssnhub";
+            // --- CHOIX DU COMPTE ---
+            // Vidéo ou fichier > 10Mo -> Compte dn3vf0mhm, sinon dtkssnhub
+            const isLarge = file.type.startsWith('video/') || file.size > 10 * 1024 * 1024;
+            const cloudName = isLarge ? "dn3vf0mhm" : "dtkssnhub";
 
             const formData = new FormData();
             formData.append('file', file);
@@ -576,21 +588,20 @@ async function handleSend() {
             
             if(data.secure_url) {
                 url = data.secure_url;
-                publicId = data.public_id; // Cet ID est vital pour la suppression
+                publicId = data.public_id; // On récupère l'ID pour la future suppression
             }
         } catch (err) { 
             console.error(err); 
-            return alert("Erreur d'upload."); 
+            return alert("Erreur d'envoi média."); 
         }
     }
 
-    // Insertion avec media_public_id
     await _supabase.from('messages').insert([{
         sender_id: currentUser.id, 
         sender_phone: currentProfile.phone,
         content: content, 
         image_url: url, 
-        media_public_id: publicId, 
+        media_public_id: publicId, // On enregistre l'ID dans Supabase
         reply_to_id: replyToId,
         time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
     }]);
@@ -600,15 +611,13 @@ async function handleSend() {
     cancelReply();
 }
 
-// --- FONCTION DE SUPPRESSION (SUPPRIMER MESSAGE) ---
 async function supprimerMessage(id, table, publicId = null) {
     if (!confirm("Supprimer définitivement ce message et son média ?")) return;
 
-    // Suppression Cloudinary (uniquement si on a un ID)
     if (publicId && publicId !== "null" && publicId !== "" && publicId !== "undefined") {
         try {
-            // On détecte le compte selon le type de média
-            const isVideo = publicId.match(/\.(mp4|mov|avi)$/i); 
+            // Détection du type pour choisir le compte
+            const isVideo = publicId.match(/\.(mp4|mov|avi|pdf|zip)$/i) || publicId.includes('video'); 
             const targetAccount = isVideo ? "videos" : "photos";
 
             await fetch('https://jukfjoljkaoeicopjuwo.supabase.co/functions/v1/delete-cloudinary-media', {
@@ -620,20 +629,20 @@ async function supprimerMessage(id, table, publicId = null) {
                 body: JSON.stringify({ 
                     public_id: publicId,
                     resource_type: isVideo ? "video" : "image",
-                    account: targetAccount
+                    account: targetAccount 
                 })
             });
+            console.log("Média supprimé du cloud:", targetAccount);
         } catch (err) {
-            console.error("Erreur Cloudinary:", err);
+            console.error("Erreur suppression Cloudinary:", err);
         }
     }
 
-    // Suppression Supabase
     const { error } = await _supabase.from(table).delete().eq('id', id);
     if (error) {
-        alert("Erreur DB");
+        alert("Erreur base de données.");
     } else {
-        alert("Message et média supprimés !");
+        alert("Supprimé avec succès !");
         table === 'messages' ? loadChat() : loadInbox();
     }
 }
