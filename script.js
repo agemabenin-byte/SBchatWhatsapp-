@@ -65,7 +65,9 @@ async function handleSend() {
     const fileInput = document.getElementById('file-input');
     const content = input.value.trim();
     const file = fileInput.files[0];
+    
     let url = null;
+    let publicId = null; // Nouvelle variable pour le Public ID
 
     if(!content && !file) return;
 
@@ -74,24 +76,36 @@ async function handleSend() {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('upload_preset', "chat_preset");
+            
             const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
                 method: 'POST', body: formData
             });
             const data = await response.json();
-            if(data.secure_url) url = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
-        } catch (err) { console.error(err); return alert("Erreur image."); }
+            
+            if(data.secure_url) {
+                url = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+                publicId = data.public_id; // On récupère l'identifiant unique ici
+            }
+        } catch (err) { 
+            console.error(err); 
+            return alert("Erreur lors de l'upload du média."); 
+        }
     }
 
+    // Insertion dans Supabase avec le media_public_id
     await _supabase.from('messages').insert([{
         sender_id: currentUser.id, 
         sender_phone: currentProfile.phone,
         content: content, 
         image_url: url, 
+        media_public_id: publicId, // On enregistre l'ID pour la future suppression
         reply_to_id: replyToId,
         time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
     }]);
 
-    input.value = ""; fileInput.value = ""; cancelReply();
+    input.value = ""; 
+    fileInput.value = ""; 
+    cancelReply();
 }
 
 // Cette fonction gère tes boutons "Retour" (la flèche ⬅ dans ton HTML)
