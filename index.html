@@ -68,12 +68,15 @@
                 ✉️<span id="inboxCount">0</span>
             </div>
             
-            <div style="display:flex; align-items:center;">
+            <div style="display:flex; align-items:center; flex:1; justify-content:center;">
                 <img src="https://jukfjoljkaoeicopjuwo.supabase.co/storage/v1/object/public/chat-media/1002075620.png" style="width:30px; margin-right:8px; border-radius:50%;">
                 <b id="groupTitle">SuccesBonheur</b>
             </div>
             
-            <div id="adminMenuBtn" onclick="toggleMenu()">⋮</div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <input type="text" id="chat-search" placeholder="🔍 Rechercher..." style="padding:5px 10px; border-radius:15px; border:1px solid white; background:rgba(255,255,255,0.9); color:#075E54; outline:none; width:120px;" oninput="filterChatMessages()">
+                <div id="adminMenuBtn" onclick="toggleMenu()">⋮</div>
+            </div>
             <div id="adminDropdown" class="dropdown-content">
                 <button onclick="showView('page-members')">👥 Liste des membres</button>
                 <button onclick="showView('page-broadcast')">📢 Diffusion à tous</button>
@@ -129,7 +132,10 @@
     <div id="page-members" class="page" style="display:none;">
         <div class="header">
             <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
-            <b>Membres</b>
+            <div style="flex:1; display:flex; justify-content:center; align-items:center;">
+                <b>Membres</b>
+            </div>
+            <input type="text" id="members-search" placeholder="🔍 Rechercher..." style="padding:5px 10px; border-radius:15px; border:1px solid white; background:rgba(255,255,255,0.9); color:#075E54; outline:none; width:120px; position:absolute; right:20px;" oninput="filterMembers()">
         </div>
         <div id="members-list" class="messages"></div>
     </div>
@@ -137,7 +143,10 @@
     <div id="page-inbox" class="page" style="display:none;">
         <div class="header">
             <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
-            <b>Méssages Privés</b>
+            <div style="flex:1; display:flex; justify-content:center; align-items:center;">
+                <b>Méssages Privés</b>
+            </div>
+            <input type="text" id="inbox-search" placeholder="🔍 Rechercher..." style="padding:5px 10px; border-radius:15px; border:1px solid white; background:rgba(255,255,255,0.9); color:#075E54; outline:none; width:120px; position:absolute; right:20px;" oninput="filterInbox()">
         </div>
         <div id="inbox-list" class="messages"></div>
     </div>
