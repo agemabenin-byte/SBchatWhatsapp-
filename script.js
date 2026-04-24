@@ -59,6 +59,16 @@ async function checkSession() {
     }
 }
 
+// --- FONCTION DE FORMATTAGE DES NOMBRES ---
+function formatNumber(num) {
+    if (num >= 1000000) {
+        return (num / 1000000).toFixed(1) + 'M';
+    } else if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+}
+
 // --- COMPTEUR DE MESSAGES NON LUS ---
 async function updateInboxCount() {
     try {
@@ -75,7 +85,7 @@ async function updateInboxCount() {
         const count = data ? data.length : 0;
         const countElement = document.getElementById('inboxCount');
         if (countElement) {
-            countElement.innerText = count;
+            countElement.innerText = formatNumber(count);
             // Cacher le compteur si zéro
             countElement.style.display = count > 0 ? 'inline' : 'none';
         }
@@ -444,7 +454,7 @@ async function loadMembers() {
     // Mettre à jour le compteur total de membres
     const countElement = document.getElementById('total-members-count');
     if (countElement) {
-        countElement.innerText = data.length;
+        countElement.innerText = formatNumber(data.length);
     }
     
     // Trier : administrateurs en premier, puis les autres
@@ -472,6 +482,12 @@ async function loadMembers() {
             statusInfo = '<span style="color:red;">🚫 Banni</span>';
         }
         
+        // Icône de blocage pour les admins (uniquement pour les non-admins)
+        let blockIcon = "";
+        if (currentUserIsAdmin && !m.is_admin && !m.is_banned) {
+            blockIcon = `<span onclick="bloquerUtilisateur('${m.id}', '${m.phone}')" style="cursor:pointer; color:orange; margin-right:8px; font-size:16px;">🚫</span>`;
+        }
+        
         // Boutons d'action pour les admins
         if (currentUserIsAdmin && !m.is_admin) {
             if (m.is_banned) {
@@ -481,7 +497,7 @@ async function loadMembers() {
             }
         }
         
-        div.innerHTML = `<div><b>${m.phone}</b><br><small>${m.email || ''}</small><br>${statusInfo}</div>
+        div.innerHTML = `<div>${blockIcon}<b>${m.phone}</b><br><small>${m.email || ''}</small><br>${statusInfo}</div>
                          <div>${actionButtons}</div>`;
         list.appendChild(div);
     });
