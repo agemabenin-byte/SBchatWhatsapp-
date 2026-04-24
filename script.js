@@ -59,8 +59,125 @@ async function handleFileSelect() {
     if (file) await handleSend();
 }
 
+// --- SYSTÈME ANTI-SPAM ---
+async function bannirUtilisateur(userId, userPhone) {
+    if (!confirm(`Bannir ${userPhone} ? Il ne pourra plus envoyer de messages dans le groupe.`)) return;
+
+    try {
+        const { error } = await _supabase
+            .from('profiles')
+            .update({ is_banned: true })
+            .eq('id', userId);
+
+        if (error) {
+            alert('Erreur lors du bannissement: ' + error.message);
+        } else {
+            alert(`${userPhone} a été banni du groupe.`);
+            loadMembers(); // Recharger la liste des membres
+        }
+    } catch (err) {
+        console.error('Erreur bannissement:', err);
+        alert('Erreur lors du bannissement');
+    }
+}
+
+async function debannirUtilisateur(userId, userPhone) {
+    if (!confirm(`Débannir ${userPhone} ?`)) return;
+
+    try {
+        const { error } = await _supabase
+            .from('profiles')
+            .update({ is_banned: false })
+            .eq('id', userId);
+
+        if (error) {
+            alert('Erreur lors du débannissement: ' + error.message);
+        } else {
+            alert(`${userPhone} a été débanni.`);
+            loadMembers(); // Recharger la liste des membres
+        }
+    } catch (err) {
+        console.error('Erreur débannissement:', err);
+        alert('Erreur lors du débannissement');
+    }
+}
+
+async function bloquerUtilisateur(senderId, senderPhone) {
+    if (!confirm(`Bloquer ${senderPhone} ? Vous ne recevrez plus ses messages privés.`)) return;
+
+    try {
+        // Vérifier si l'expéditeur est admin
+        const { data: senderProfile } = await _supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', senderId)
+            .single();
+
+        if (senderProfile && senderProfile.is_admin) {
+            alert('Impossible de bloquer un administrateur.');
+            return;
+        }
+
+        // Ajouter à la table blocked_users
+        const { error } = await _supabase
+            .from('blocked_users')
+            .insert([{
+                blocker_id: currentUser.id,
+                blocked_id: senderId
+            }]);
+
+        if (error) {
+            if (error.code === '23505') { // Duplicate key
+                alert('Cet utilisateur est déjà bloqué.');
+            } else {
+                alert('Erreur lors du blocage: ' + error.message);
+            }
+        } else {
+            alert(`${senderPhone} a été bloqué.`);
+            loadInbox(); // Recharger l'inbox
+        }
+    } catch (err) {
+        console.error('Erreur blocage:', err);
+        alert('Erreur lors du blocage');
+    }
+}
+
+async function debloquerUtilisateur(blockedId, blockedPhone) {
+    if (!confirm(`Débloquer ${blockedPhone} ?`)) return;
+
+    try {
+        const { error } = await _supabase
+            .from('blocked_users')
+            .delete()
+            .eq('blocker_id', currentUser.id)
+            .eq('blocked_id', blockedId);
+
+        if (error) {
+            alert('Erreur lors du déblocage: ' + error.message);
+        } else {
+            alert(`${blockedPhone} a été débloqué.`);
+            loadInbox(); // Recharger l'inbox
+        }
+    } catch (err) {
+        console.error('Erreur déblocage:', err);
+        alert('Erreur lors du déblocage');
+    }
+}
+
+// Vérifier si un utilisateur est bloqué par l'utilisateur actuel
+async function estUtilisateurBloque(senderId) {
+    const { data } = await _supabase
+        .from('blocked_users')
+        .select('*')
+        .eq('blocker_id', currentUser.id)
+        .eq('blocked_id', senderId)
+        .single();
+    
+    return data !== null;
+}
+
 async function handleSend() {
-    if(currentProfile && currentProfile.is_banned) return alert("Banni !");
+    if(currentProfile && currentProfile.is_banned) return alert("Vous êtes banni du groupe !");
     const input = document.getElementById('msgInput');
     const fileInput = document.getElementById('file-input');
     const content = input.value.trim();
@@ -172,7 +289,28 @@ async function loadInbox() {
     box.innerHTML = "";
 
     if(data && data.length > 0) {
-        data.forEach(msg => {
+        // Filtrer les messages des utilisateurs bloqués
+        const filteredData = [];
+        for (const msg of data) {
+            const isBlocked = await estUtilisateurBloque(msg.from_id);
+            if (!isBlocked) {
+                filteredData.push(msg);
+            }
+        }
+
+        // Trier les messages : admin en premier, puis les autres
+        const sortedData = filteredData.sort((a, b) => {
+            // Vérifier si l'expéditeur est admin (utiliser le nouveau système is_admin)
+            const aIsAdmin = ADMINS_PHONES.includes(a.sender_phone);
+            const bIsAdmin = ADMINS_PHONES.includes(b.sender_phone);
+            
+            // Les messages admin en premier
+            if (aIsAdmin && !bIsAdmin) return -1;
+            if (!aIsAdmin && bIsAdmin) return 1;
+            return 0; // Garder l'ordre original si même statut
+        });
+
+        for (const msg of sortedData) {
             const div = document.createElement('div');
             div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
             
@@ -193,11 +331,35 @@ async function loadInbox() {
                 messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:8px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier joint</a>');
             }
 
-            div.innerHTML = `<b>De: ${msg.sender_phone || 'Inconnu'}</b>
+            // Vérifier si on doit afficher la poubelle
+            const senderIsAdmin = ADMINS_PHONES.includes(msg.sender_phone);
+            const currentUserIsAdmin = currentProfile && currentProfile.is_admin;
+            let deleteIcon = "";
+
+            // Conditions pour afficher la poubelle :
+            // - Si l'expéditeur n'est PAS admin OU
+            // - Si l'utilisateur actuel est admin
+            if (!senderIsAdmin || currentUserIsAdmin) {
+                deleteIcon = `<span onclick="supprimerMessageInbox('${msg.id}', '${msg.image_url || ''}', '${msg.media_public_id || ''}', '${msg.sender_phone}')" style="cursor:pointer; color:red; margin-left:8px; font-size:12px;">🗑️</span>`;
+            }
+
+            // Bouton de blocage (uniquement pour les non-admins)
+            let blockButton = "";
+            if (!senderIsAdmin) {
+                blockButton = `<span onclick="bloquerUtilisateur('${msg.from_id}', '${msg.sender_phone}')" style="cursor:pointer; color:orange; margin-left:8px; font-size:12px;">🚫</span>`;
+            }
+
+            // Style spécial pour les messages admin
+            if (senderIsAdmin) {
+                div.style.borderLeftColor = "#FFD700"; // Or pour les messages admin
+                div.style.backgroundColor = "#FFF9E6"; // Fond clair pour les messages admin
+            }
+
+            div.innerHTML = `<b>De: ${msg.sender_phone || 'Inconnu'}${senderIsAdmin ? ' ⭐' : ''}${deleteIcon}${blockButton}</b>
                              <div style="margin:5px 0; word-wrap: break-word;">${messageAffiche}</div>
                              <small style="color:gray; font-size:10px;">${msg.time}</small>`;
             box.appendChild(div);
-        });
+        }
     } else { 
         box.innerHTML = "<p style='text-align:center;'>Aucun message reçu.</p>"; 
     }
@@ -238,12 +400,34 @@ async function loadMembers() {
     list.innerHTML = "Chargement...";
     const { data } = await _supabase.from('profiles').select('*');
     list.innerHTML = "";
+    const currentUserIsAdmin = currentProfile && currentProfile.is_admin;
+    
     data.forEach(m => {
         const div = document.createElement('div');
         div.className = 'member-row';
         div.style = "background:white; margin:10px; padding:15px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;";
-        div.innerHTML = `<div><b>${m.phone}</b><br><small>${m.email || ''}</small></div>
-                         <button onclick="openPrivate('${m.id}', '${m.phone}')" style="background:#25D366; color:white; border:none; padding:8px 12px; border-radius:8px;">✉️</button>`;
+        
+        let statusInfo = "";
+        let actionButtons = `<button onclick="openPrivate('${m.id}', '${m.phone}')" style="background:#25D366; color:white; border:none; padding:8px 12px; border-radius:8px;">✉️</button>`;
+        
+        // Informations de statut
+        if (m.is_admin) {
+            statusInfo = '<span style="color:gold;">⭐ Admin</span>';
+        } else if (m.is_banned) {
+            statusInfo = '<span style="color:red;">🚫 Banni</span>';
+        }
+        
+        // Boutons d'action pour les admins
+        if (currentUserIsAdmin && !m.is_admin) {
+            if (m.is_banned) {
+                actionButtons += ` <button onclick="debannirUtilisateur('${m.id}', '${m.phone}')" style="background:green; color:white; border:none; padding:8px 12px; border-radius:8px; margin-left:5px;">✅ Débannir</button>`;
+            } else {
+                actionButtons += ` <button onclick="bannirUtilisateur('${m.id}', '${m.phone}')" style="background:red; color:white; border:none; padding:8px 12px; border-radius:8px; margin-left:5px;">🚫 Bannir</button>`;
+            }
+        }
+        
+        div.innerHTML = `<div><b>${m.phone}</b><br><small>${m.email || ''}</small><br>${statusInfo}</div>
+                         <div>${actionButtons}</div>`;
         list.appendChild(div);
     });
 }
@@ -347,7 +531,10 @@ function renderMsg(m) {
          mediaSupplementaire = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px;">`;
     }
 
-    div.innerHTML = `<small><b>${m.sender_phone}</b></small>
+    // Icône de poubelle pour suppression (visible pour tous les messages du groupe)
+    const deleteIcon = `<span onclick="supprimerMessageGroupe('${m.id}', '${m.image_url || ''}', '${m.media_public_id || ''}')" style="cursor:pointer; color:red; margin-left:8px; font-size:12px;">🗑️</span>`;
+
+    div.innerHTML = `<small><b>${m.sender_phone}</b>${deleteIcon}</small>
                      ${mediaSupplementaire}
                      <div>${contenuFinal}</div>
                      <small style="font-size:10px; display:block; text-align:right;">${m.time}</small>`;
@@ -477,8 +664,103 @@ async function handleInboxMedia(type) {
     xhr.send(formData);
 }
 
+// --- FONCTION EDGE SUPABASE POUR SUPPRESSION CLOUDINARY ---
+async function supprimerMediaCloudinary(imageUrl, mediaPublicId) {
+    try {
+        // Extraire le public_id de l'URL si mediaPublicId n'est pas fourni
+        let publicId = mediaPublicId;
+        if (!publicId && imageUrl) {
+            // Extraire de l'URL Cloudinary
+            const urlParts = imageUrl.split('/');
+            const fileName = urlParts[urlParts.length - 1];
+            publicId = fileName.split('.')[0]; // Enlever l'extension
+        }
+
+        if (!publicId) return; // Pas d'ID à supprimer
+
+        // Déterminer le compte Cloudinary (photos ou videos)
+        const account = imageUrl && imageUrl.includes('dn3vf0mhm') ? 'videos' : 'photos';
+        const resourceType = imageUrl && (imageUrl.includes('/video/') || imageUrl.includes('.mp4') || imageUrl.includes('.mov')) ? 'video' : 'image';
+
+        // Appeler la fonction Edge Supabase
+        const { data, error } = await _supabase.functions.invoke('delete-cloudinary-media', {
+            body: {
+                public_id: publicId,
+                resource_type: resourceType,
+                account: account
+            }
+        });
+
+        if (error) {
+            console.error('Erreur suppression Cloudinary:', error);
+        } else {
+            console.log('Média supprimé avec succès:', data);
+        }
+    } catch (err) {
+        console.error('Erreur lors de la suppression du média:', err);
+    }
+}
+
+// --- FONCTIONS SUPPRESSION MESSAGES ---
+async function supprimerMessageGroupe(messageId, imageUrl, mediaPublicId) {
+    if (!confirm('Voulez-vous vraiment supprimer ce message ?')) return;
+
+    try {
+        // Supprimer le média sur Cloudinary d'abord
+        if (imageUrl || mediaPublicId) {
+            await supprimerMediaCloudinary(imageUrl, mediaPublicId);
+        }
+
+        // Supprimer le message de la base de données
+        const { error } = await _supabase
+            .from('messages')
+            .delete()
+            .eq('id', messageId);
+
+        if (error) {
+            alert('Erreur lors de la suppression du message: ' + error.message);
+        } else {
+            // Recharger le chat
+            loadChat();
+        }
+    } catch (err) {
+        console.error('Erreur suppression message:', err);
+        alert('Erreur lors de la suppression du message');
+    }
+}
+
+async function supprimerMessageInbox(messageId, imageUrl, mediaPublicId, senderPhone) {
+    if (!confirm('Voulez-vous vraiment supprimer ce message ?')) return;
+
+    try {
+        // Supprimer le média sur Cloudinary d'abord
+        if (imageUrl || mediaPublicId) {
+            await supprimerMediaCloudinary(imageUrl, mediaPublicId);
+        }
+
+        // Supprimer le message de l'inbox
+        const { error } = await _supabase
+            .from('inbox')
+            .delete()
+            .eq('id', messageId);
+
+        if (error) {
+            alert('Erreur lors de la suppression du message: ' + error.message);
+        } else {
+            // Recharger l'inbox
+            loadInbox();
+        }
+    } catch (err) {
+        console.error('Erreur suppression message inbox:', err);
+        alert('Erreur lors de la suppression du message');
+    }
+}
+
 function gererAffichageAdmin(userPhone) {
-    if (ADMINS_PHONES.includes(userPhone)) {
+    // Vérifier si l'utilisateur est admin via le champ is_admin
+    const isAdmin = currentProfile && currentProfile.is_admin;
+    
+    if (isAdmin) {
         // On affiche les trombones pour l'admin
         const attachGroup = document.getElementById('admin-attach-btn');
         const attachBC = document.getElementById('admin-bc-attach');
@@ -489,6 +771,19 @@ function gererAffichageAdmin(userPhone) {
         if (attachBC) attachBC.style.display = 'inline-block';
         if (attachInbox) attachInbox.style.display = 'inline-block';
         if (menuBtn) menuBtn.style.display = 'block'; // S'assure que le menu ⋮ est visible
+    } else {
+        // Cacher les boutons admin pour les non-admins
+        const attachGroup = document.getElementById('admin-attach-btn');
+        const attachBC = document.getElementById('admin-bc-attach');
+        const attachInbox = document.getElementById('admin-inbox-attach');
+        const broadcastBtn = document.querySelector('button[onclick="showView(\'page-broadcast\')"]');
+        const exportBtn = document.querySelector('button[onclick="exporterContacts()"]');
+
+        if (attachGroup) attachGroup.style.display = 'none';
+        if (attachBC) attachBC.style.display = 'none';
+        if (attachInbox) attachInbox.style.display = 'none';
+        if (broadcastBtn) broadcastBtn.style.display = 'none';
+        if (exportBtn) exportBtn.style.display = 'none';
     }
 }
 
