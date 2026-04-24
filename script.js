@@ -289,14 +289,16 @@ async function loadInbox() {
     box.innerHTML = "";
 
     if(data && data.length > 0) {
-        // Filtrer les messages des utilisateurs bloqués
-        const filteredData = [];
-        for (const msg of data) {
-            const isBlocked = await estUtilisateurBloque(msg.from_id);
-            if (!isBlocked) {
-                filteredData.push(msg);
-            }
-        }
+        // Récupérer tous les utilisateurs bloqués en une seule requête
+        const { data: blockedUsers } = await _supabase
+            .from('blocked_users')
+            .select('blocked_id')
+            .eq('blocker_id', currentUser.id);
+        
+        const blockedIds = new Set(blockedUsers?.map(b => b.blocked_id) || []);
+        
+        // Filtrer les messages sans requêtes asynchrones
+        const filteredData = data.filter(msg => !blockedIds.has(msg.from_id));
 
         // Trier les messages : admin en premier, puis les autres
         const sortedData = filteredData.sort((a, b) => {
@@ -397,8 +399,14 @@ async function executeBroadcast() {
 // --- LISTE DES MEMBRES ---
 async function loadMembers() {
     const list = document.getElementById('members-list');
-    list.innerHTML = "Chargement...";
+    list.innerHTML = '<div style="text-align:center; padding:20px;">⏳ Chargement des membres...</div>';
+    
     const { data } = await _supabase.from('profiles').select('*');
+    if (!data) {
+        list.innerHTML = '<div style="text-align:center; padding:20px;">❌ Erreur de chargement</div>';
+        return;
+    }
+    
     list.innerHTML = "";
     const currentUserIsAdmin = currentProfile && currentProfile.is_admin;
     
@@ -496,6 +504,37 @@ function togglePass(id, icon) {
 function cancelReply() { replyToId = null; document.getElementById('reply-preview').style.display = 'none'; }
 async function handleLogout() { await _supabase.auth.signOut(); location.reload(); }
 
+// --- FONCTIONS DE RECHERCHE ---
+function filterChatMessages() {
+    const searchTerm = document.getElementById('chat-search').value.toLowerCase();
+    const messages = document.querySelectorAll('#chat-box .msg');
+    
+    messages.forEach(msg => {
+        const text = msg.textContent.toLowerCase();
+        msg.style.display = text.includes(searchTerm) ? 'flex' : 'none';
+    });
+}
+
+function filterInbox() {
+    const searchTerm = document.getElementById('inbox-search').value.toLowerCase();
+    const messages = document.querySelectorAll('#inbox-list > div');
+    
+    messages.forEach(msg => {
+        const text = msg.textContent.toLowerCase();
+        msg.style.display = text.includes(searchTerm) ? 'block' : 'none';
+    });
+}
+
+function filterMembers() {
+    const searchTerm = document.getElementById('members-search').value.toLowerCase();
+    const members = document.querySelectorAll('#members-list .member-row');
+    
+    members.forEach(member => {
+        const text = member.textContent.toLowerCase();
+        member.style.display = text.includes(searchTerm) ? 'flex' : 'none';
+    });
+}
+
 // --- CHAT RENDER ---
 async function loadChat() {
     const { data } = await _supabase.from('messages').select('*').order('id', {ascending: true});
@@ -531,8 +570,9 @@ function renderMsg(m) {
          mediaSupplementaire = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px;">`;
     }
 
-    // Icône de poubelle pour suppression (visible pour tous les messages du groupe)
-    const deleteIcon = `<span onclick="supprimerMessageGroupe('${m.id}', '${m.image_url || ''}', '${m.media_public_id || ''}')" style="cursor:pointer; color:red; margin-left:8px; font-size:12px;">🗑️</span>`;
+    // Icône de poubelle pour suppression (uniquement pour les admins)
+    const currentUserIsAdmin = currentProfile && currentProfile.is_admin;
+    const deleteIcon = currentUserIsAdmin ? `<span onclick="supprimerMessageGroupe('${m.id}', '${m.image_url || ''}', '${m.media_public_id || ''}')" style="cursor:pointer; color:red; margin-left:8px; font-size:12px;">🗑️</span>` : "";
 
     div.innerHTML = `<small><b>${m.sender_phone}</b>${deleteIcon}</small>
                      ${mediaSupplementaire}
@@ -585,7 +625,6 @@ async function handleBroadcastMedia(type) {
     const xhr = new XMLHttpRequest();
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('upload_preset', "video_preset"); 
 
     xhr.upload.addEventListener("progress", (e) => {
         if (e.lengthComputable) {
@@ -612,10 +651,15 @@ async function handleBroadcastMedia(type) {
         }
     });
 
-    // On utilise ton compte vidéo pour tout (plus simple)
-    const cloudName = "dn3vf0mhm";
-    const resourceType = type === 'image' ? "image" : "video";
-    xhr.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`);
+    // Séparation des comptes : images vers dtkssnhub, vidéos/fichiers vers dn3vf0mhm
+    if (type === 'image') {
+        formData.append('upload_preset', "chat_preset");
+        xhr.open("POST", `https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`);
+    } else {
+        formData.append('upload_preset', "video_preset");
+        const resourceType = file.type.startsWith('video/') ? "video" : "raw";
+        xhr.open("POST", `https://api.cloudinary.com/v1_1/dn3vf0mhm/${resourceType}/upload`);
+    }
     xhr.send(formData);
 }
 
@@ -635,7 +679,6 @@ async function handleInboxMedia(type) {
     const xhr = new XMLHttpRequest();
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('upload_preset', "video_preset"); // Utilise ton preset
 
     xhr.upload.addEventListener("progress", (e) => {
         if (e.lengthComputable) {
@@ -658,9 +701,15 @@ async function handleInboxMedia(type) {
         }
     });
 
-    const cloudName = "dn3vf0mhm"; // Ton compte vidéo
-    const resourceType = type === 'image' ? "image" : "video";
-    xhr.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`);
+    // Séparation des comptes : images vers dtkssnhub, vidéos/fichiers vers dn3vf0mhm
+    if (type === 'image') {
+        formData.append('upload_preset', "chat_preset");
+        xhr.open("POST", `https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`);
+    } else {
+        formData.append('upload_preset', "video_preset");
+        const resourceType = file.type.startsWith('video/') ? "video" : "raw";
+        xhr.open("POST", `https://api.cloudinary.com/v1_1/dn3vf0mhm/${resourceType}/upload`);
+    }
     xhr.send(formData);
 }
 
