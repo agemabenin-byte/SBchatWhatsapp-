@@ -72,9 +72,9 @@
                 <b id="groupTitle">SuccesBonheur</b>
             </div>
             
-            <div style="display:flex; align-items:center; gap:10px;">
-                <input type="text" id="chat-search" placeholder="🔍 Rechercher..." style="padding:5px 10px; border-radius:15px; border:1px solid white; background:rgba(255,255,255,0.9); color:#075E54; outline:none; width:96px;" oninput="filterChatMessages()">
-                <div id="adminMenuBtn" onclick="toggleMenu()">⋮</div>
+            <div style="display:flex; align-items:center; gap:20px;">
+                <input type="text" id="chat-search" placeholder="🔍 Rechercher..." style="padding:5px 10px; border-radius:15px; border:1px solid white; background:rgba(255,255,255,0.9); color:#075E54; outline:none; width:96px; margin-right:auto;" oninput="filterChatMessages()">
+                <div id="adminMenuBtn" onclick="toggleMenu()" style="color:black; font-size:24px; font-weight:bold; background:rgba(255,255,255,0.8); padding:5px 8px; border-radius:50%; flex-shrink:0;">⋮</div>
             </div>
             <div id="adminDropdown" class="dropdown-content">
                 <button onclick="showView('page-members')">👥 Liste des membres</button>
