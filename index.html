@@ -69,7 +69,6 @@
             </div>
             
             <div style="display:flex; align-items:center; flex:1; justify-content:center;">
-                <img src="https://jukfjoljkaoeicopjuwo.supabase.co/storage/v1/object/public/chat-media/1002075620.png" style="width:30px; margin-right:8px; border-radius:50%;">
                 <b id="groupTitle">SuccesBonheur</b>
             </div>
             
@@ -132,10 +131,10 @@
     <div id="page-members" class="page" style="display:none;">
         <div class="header">
             <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
-            <div style="flex:1; display:flex; justify-content:center; align-items:center;">
-                <b>Membres</b>
+            <div style="flex:1; display:flex; justify-content:center; align-items:center; padding:0 60px;">
+                <b>Membres (<span id="total-members-count">0</span>)</b>
             </div>
-            <input type="text" id="members-search" placeholder="🔍 Rechercher..." style="padding:5px 10px; border-radius:15px; border:1px solid white; background:rgba(255,255,255,0.9); color:#075E54; outline:none; width:120px; position:absolute; right:20px;" oninput="filterMembers()">
+            <input type="text" id="members-search" placeholder="🔍..." style="padding:5px 10px; border-radius:15px; border:1px solid white; background:rgba(255,255,255,0.9); color:#075E54; outline:none; width:80px; position:absolute; right:20px;" oninput="filterMembers()">
         </div>
         <div id="members-list" class="messages"></div>
     </div>
@@ -143,10 +142,10 @@
     <div id="page-inbox" class="page" style="display:none;">
         <div class="header">
             <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
-            <div style="flex:1; display:flex; justify-content:center; align-items:center;">
+            <div style="flex:1; display:flex; justify-content:center; align-items:center; padding:0 60px;">
                 <b>Méssages Privés</b>
             </div>
-            <input type="text" id="inbox-search" placeholder="🔍 Rechercher..." style="padding:5px 10px; border-radius:15px; border:1px solid white; background:rgba(255,255,255,0.9); color:#075E54; outline:none; width:120px; position:absolute; right:20px;" oninput="filterInbox()">
+            <input type="text" id="inbox-search" placeholder="🔍..." style="padding:5px 10px; border-radius:15px; border:1px solid white; background:rgba(255,255,255,0.9); color:#075E54; outline:none; width:80px; position:absolute; right:20px;" oninput="filterInbox()">
         </div>
         <div id="inbox-list" class="messages"></div>
     </div>
