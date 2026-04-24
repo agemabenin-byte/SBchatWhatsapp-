@@ -24,7 +24,10 @@ function showView(viewId, isBack = false) {
 
     // 4. Chargements spécifiques
     if (viewId === 'page-members') loadMembers();
-    if (viewId === 'page-inbox') loadInbox();
+    if (viewId === 'page-inbox') {
+        loadInbox();
+        updateInboxCount(); // Mettre à jour le compteur
+    }
 }
 
 // --- SESSION (MISE À JOUR) ---
@@ -41,6 +44,9 @@ async function checkSession() {
             gererAffichageAdmin(prof.phone);
             // -----------------------------------------------
 
+            // Mettre à jour le compteur de messages non lus
+            updateInboxCount();
+
             history.replaceState({ viewId: 'page-chat' }, "", "");
             showView('page-chat', true);
             loadChat();
@@ -50,6 +56,31 @@ async function checkSession() {
         }
     } else { 
         showView('page-login', true); 
+    }
+}
+
+// --- COMPTEUR DE MESSAGES NON LUS ---
+async function updateInboxCount() {
+    try {
+        const { data, error } = await _supabase
+            .from('inbox')
+            .select('id')
+            .eq('to_id', currentUser.id);
+        
+        if (error) {
+            console.error('Erreur compteur inbox:', error);
+            return;
+        }
+        
+        const count = data ? data.length : 0;
+        const countElement = document.getElementById('inboxCount');
+        if (countElement) {
+            countElement.innerText = count;
+            // Cacher le compteur si zéro
+            countElement.style.display = count > 0 ? 'inline' : 'none';
+        }
+    } catch (err) {
+        console.error('Erreur updateInboxCount:', err);
     }
 }
 
@@ -205,7 +236,7 @@ async function handleSend() {
         content: content, 
         image_url: url, 
         reply_to_id: replyToId,
-        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+        time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
     }]);
 
     input.value = ""; fileInput.value = ""; cancelReply();
@@ -258,7 +289,7 @@ async function executeSendPrivate() {
         to_id: window.currentDestId,
         content: content,
         sender_phone: currentProfile.phone, // Ton numéro stocké dans currentProfile
-        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+        time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
     }]);
 
     if(error) {
@@ -381,7 +412,7 @@ async function executeBroadcast() {
         to_id: member.id,
         content: content,
         sender_phone: currentProfile.phone, // On identifie l'admin par son numéro
-        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+        time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
     }));
 
     const { error } = await _supabase.from('inbox').insert(messages);
@@ -410,7 +441,23 @@ async function loadMembers() {
     list.innerHTML = "";
     const currentUserIsAdmin = currentProfile && currentProfile.is_admin;
     
-    data.forEach(m => {
+    // Mettre à jour le compteur total de membres
+    const countElement = document.getElementById('total-members-count');
+    if (countElement) {
+        countElement.innerText = data.length;
+    }
+    
+    // Trier : administrateurs en premier, puis les autres
+    const sortedData = data.sort((a, b) => {
+        const aIsAdmin = a.is_admin || ADMINS_PHONES.includes(a.phone);
+        const bIsAdmin = b.is_admin || ADMINS_PHONES.includes(b.phone);
+        
+        if (aIsAdmin && !bIsAdmin) return -1;
+        if (!aIsAdmin && bIsAdmin) return 1;
+        return 0; // Garder l'ordre original si même statut
+    });
+    
+    sortedData.forEach(m => {
         const div = document.createElement('div');
         div.className = 'member-row';
         div.style = "background:white; margin:10px; padding:15px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;";
