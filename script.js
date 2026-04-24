@@ -59,6 +59,40 @@ async function handleFileSelect() {
     if (file) await handleSend();
 }
 
+async function handleSend() {
+    if(currentProfile && currentProfile.is_banned) return alert("Banni !");
+    const input = document.getElementById('msgInput');
+    const fileInput = document.getElementById('file-input');
+    const content = input.value.trim();
+    const file = fileInput.files[0];
+    let url = null;
+
+    if(!content && !file) return;
+
+    if(file) {
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', "chat_preset");
+            const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
+                method: 'POST', body: formData
+            });
+            const data = await response.json();
+            if(data.secure_url) url = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+        } catch (err) { console.error(err); return alert("Erreur image."); }
+    }
+
+    await _supabase.from('messages').insert([{
+        sender_id: currentUser.id, 
+        sender_phone: currentProfile.phone,
+        content: content, 
+        image_url: url, 
+        reply_to_id: replyToId,
+        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+    }]);
+
+    input.value = ""; fileInput.value = ""; cancelReply();
+}
 
 // Cette fonction gère tes boutons "Retour" (la flèche ⬅ dans ton HTML)
 function goBack() {
@@ -126,7 +160,7 @@ async function executeSendPrivate() {
 async function loadInbox() {
     const box = document.getElementById('inbox-list');
     if(!box) return;
-    box.innerHTML = "<p style='text-align:center;'>Chargement...</p>";
+    box.innerHTML = "Chargement...";
 
     const { data, error } = await _supabase
         .from('inbox')
@@ -134,48 +168,38 @@ async function loadInbox() {
         .eq('to_id', currentUser.id)
         .order('id', {ascending: false});
     
-    if(error) return box.innerHTML = "<p style='text-align:center; color:red;'>Erreur de chargement.</p>";
+    if(error) return box.innerHTML = "Erreur de chargement.";
     box.innerHTML = "";
 
     if(data && data.length > 0) {
         data.forEach(msg => {
             const div = document.createElement('div');
-            div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position:relative;";
+            div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
             
-            // --- LOGIQUE ADMIN : CORBEILLE ---
-            let deleteBtnInbox = "";
-            // On vérifie si l'utilisateur actuel est admin
-            if (currentProfile && ADMINS_PHONES.includes(currentProfile.phone)) {
-                // On passe null pour mediaUrl ici pour simplifier, car le contenu est déjà traité plus bas
-                deleteBtnInbox = `<span onclick="supprimerMessage('${msg.id}', 'inbox', null)" 
-                                  style="cursor:pointer; color:#ff4d4d; float:right; font-size:14px; font-weight:bold;">🗑️</span>`;
-            }
-
             let messageAffiche = msg.content || "";
 
-            // Détection automatique des médias (Images, Vidéos, Fichiers)
+            // --- DÉTECTION INTELLIGENTE DES MÉDIAS ---
+            
+            // 1. Détection des Images (recherche l'extension n'importe où dans le lien)
             if (messageAffiche.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
-                messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<img src="$1" style="max-width:100%; border-radius:8px; display:block; margin-top:5px;">');
+                messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<img src="$1" style="max-width:100%; border-radius:8px; display:block; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">');
             } 
+            // 2. Détection des Vidéos
             else if (messageAffiche.match(/\.(mp4|mov)/i)) {
                 messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<video controls style="max-width:100%; border-radius:8px; margin-top:5px;"><source src="$1" type="video/mp4"></video>');
             }
+            // 3. Détection des autres fichiers joints (Cloudinary mais pas image/vidéo)
             else if (messageAffiche.includes("res.cloudinary.com")) {
-                messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:8px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier</a>');
+                messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:8px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier joint</a>');
             }
 
-            div.innerHTML = `
-                <div style="margin-bottom:5px; overflow:hidden;">
-                    ${deleteBtnInbox}
-                    <b>De: ${msg.sender_phone || 'Inconnu'}</b>
-                </div>
-                <div style="margin:5px 0; word-wrap: break-word;">${messageAffiche}</div>
-                <small style="color:gray; font-size:10px; display:block; margin-top:5px;">${msg.time}</small>`;
-            
+            div.innerHTML = `<b>De: ${msg.sender_phone || 'Inconnu'}</b>
+                             <div style="margin:5px 0; word-wrap: break-word;">${messageAffiche}</div>
+                             <small style="color:gray; font-size:10px;">${msg.time}</small>`;
             box.appendChild(div);
         });
     } else { 
-        box.innerHTML = "<p style='text-align:center; margin-top:20px; color:gray;'>Aucun message reçu.</p>"; 
+        box.innerHTML = "<p style='text-align:center;'>Aucun message reçu.</p>"; 
     }
 }
 
@@ -299,50 +323,34 @@ async function loadChat() {
 
 function renderMsg(m) {
     const box = document.getElementById('chat-box');
-    if(!box) return;
-    
     const div = document.createElement('div');
-    const myId = currentUser ? currentUser.id : null;
-    div.className = `msg ${m.sender_id === myId ? 'me' : 'other'}`;
-    div.style.position = "relative"; 
-
-    // Bouton de suppression : on passe bien l'ID média pour Cloudinary
-    let deleteBtn = "";
-    if (currentProfile && ADMINS_PHONES.includes(currentProfile.phone)) {
-        deleteBtn = `<span onclick="supprimerMessage('${m.id}', 'messages', '${m.media_public_id || ''}')" 
-                      style="cursor:pointer; color:#ff4d4d; font-size:14px; margin-left:10px;">🗑️</span>`;
-    }
+    div.className = `msg ${m.sender_id === currentUser.id ? 'me' : 'other'}`;
 
     let contenuFinal = m.content || '';
 
-    // 1. Détection des Vidéos (plus robuste pour Cloudinary)
-    if (contenuFinal.match(/\.(mp4|mov|avi|wmv)/i) || contenuFinal.includes('/video/upload/')) {
-        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+)/g, `<video controls style="max-width:100%; border-radius:8px; margin-top:5px;"><source src="$1" type="video/mp4"></video>`);
+    // Détection Vidéo dans le texte
+    if (contenuFinal.includes('.mp4') || contenuFinal.includes('.mov')) {
+        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.mp4|\.mov)[^\s]*)/g, 
+            `<video controls style="max-width:100%; border-radius:8px; margin-top:5px;">
+                <source src="$1" type="video/mp4">
+             </video>`);
     } 
-    // 2. Détection des Images
-    else if (contenuFinal.match(/\.(jpeg|jpg|gif|png|webp)/i) || contenuFinal.includes('/image/upload/')) {
-        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+)/g, `<img src="$1" style="max-width:100%; border-radius:8px; margin-top:5px;">`);
+    // Détection Image dans le texte (si pas déjà géré par m.image_url)
+    else if (contenuFinal.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
+        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.jpg|\.png|\.jpeg|\.webp)[^\s]*)/g, 
+            `<img src="$1" style="max-width:100%; border-radius:8px; margin-top:5px;">`);
     }
 
-    // 3. Gestion du média attaché (image_url) s'il n'est pas déjà dans le texte
+    // Gestion de la colonne image_url (ton système actuel pour les photos simples)
     let mediaSupplementaire = "";
     if (m.image_url && !contenuFinal.includes(m.image_url)) {
-        // Si l'URL contient "video", on affiche un lecteur, sinon une image
-        if (m.image_url.includes('/video/upload/')) {
-            mediaSupplementaire = `<video controls style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;"><source src="${m.image_url}" type="video/mp4"></video>`;
-        } else {
-            mediaSupplementaire = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
-        }
+         mediaSupplementaire = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px;">`;
     }
 
-    div.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:3px;">
-            <small><b>${m.sender_phone}</b></small>
-            ${deleteBtn}
-        </div>
-        ${mediaSupplementaire}
-        <div style="word-wrap: break-word;">${contenuFinal}</div>
-        <small style="font-size:10px; display:block; text-align:right; margin-top:3px; color:gray;">${m.time}</small>`;
+    div.innerHTML = `<small><b>${m.sender_phone}</b></small>
+                     ${mediaSupplementaire}
+                     <div>${contenuFinal}</div>
+                     <small style="font-size:10px; display:block; text-align:right;">${m.time}</small>`;
     
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
@@ -471,26 +479,16 @@ async function handleInboxMedia(type) {
 
 function gererAffichageAdmin(userPhone) {
     if (ADMINS_PHONES.includes(userPhone)) {
-        // 1. Les icônes de pièces jointes (trombonnes)
+        // On affiche les trombones pour l'admin
         const attachGroup = document.getElementById('admin-attach-btn');
         const attachBC = document.getElementById('admin-bc-attach');
         const attachInbox = document.getElementById('admin-inbox-attach');
-        
-        // 2. Les menus d'administration
         const menuBtn = document.getElementById('adminMenuBtn');
-        const exportBtn = document.getElementById('admin-export-btn');
-        const broadcastBtn = document.getElementById('admin-broadcast-btn');
 
-        // Affichage
         if (attachGroup) attachGroup.style.display = 'inline-block';
         if (attachBC) attachBC.style.display = 'inline-block';
         if (attachInbox) attachInbox.style.display = 'inline-block';
-        
-        if (menuBtn) menuBtn.style.display = 'block';
-        if (exportBtn) exportBtn.style.display = 'block';
-        if (broadcastBtn) broadcastBtn.style.display = 'block';
-        
-        console.log("Mode Admin activé pour :", userPhone);
+        if (menuBtn) menuBtn.style.display = 'block'; // S'assure que le menu ⋮ est visible
     }
 }
 
@@ -555,108 +553,6 @@ async function handleAdminFileSelect() {
     const resourceType = file.type.startsWith('video/') ? "video" : "raw";
     xhr.open("POST", `https://api.cloudinary.com/v1_1/dn3vf0mhm/${resourceType}/upload`);
     xhr.send(formData);
-}
-
-// --- FONCTION D'ENVOI (HANDLE SEND) ---
-async function handleSend() {
-    if(currentProfile && currentProfile.is_banned) return alert("Banni !");
-    const input = document.getElementById('msgInput');
-    const fileInput = document.getElementById('file-input');
-    const content = input.value.trim();
-    const file = fileInput.files[0];
-    
-    let url = null;
-    let publicId = null;
-
-    if(!content && !file) return;
-
-    if(file) {
-        try {
-            // 1. On détermine le type exact et le compte
-            const isVideo = file.type.startsWith('video/');
-            const isLarge = isVideo || file.size > 10 * 1024 * 1024;
-            const cloudName = isLarge ? "dn3vf0mhm" : "dtkssnhub";
-            const resourceType = isVideo ? "video" : "image"; // TRÈS IMPORTANT
-
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('upload_preset', "chat_preset");
-            
-            // 2. On précise le resourceType dans l'URL
-            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
-                method: 'POST', body: formData
-            });
-            
-            const data = await response.json();
-            
-            if(data.secure_url) {
-                url = data.secure_url;
-                publicId = data.public_id; 
-                console.log("Upload réussi, ID:", publicId);
-            } else {
-                console.error("Réponse Cloudinary sans URL:", data);
-                return alert("Erreur lors de l'upload du média.");
-            }
-        } catch (err) { 
-            console.error("Erreur Fetch Cloudinary:", err); 
-            return alert("Connexion au serveur de média échouée."); 
-        }
-    }
-
-    // 3. Insertion finale (On s'assure que publicId n'est pas nul ici)
-    const { error } = await _supabase.from('messages').insert([{
-        sender_id: currentUser.id, 
-        sender_phone: currentProfile.phone,
-        content: content, 
-        image_url: url, 
-        media_public_id: publicId, 
-        reply_to_id: replyToId,
-        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
-    }]);
-
-    if (error) {
-        console.error("Erreur Supabase:", error);
-    } else {
-        input.value = ""; 
-        fileInput.value = ""; 
-        cancelReply();
-    }
-}
-
-async function supprimerMessage(id, table, publicId = null) {
-    if (!confirm("Supprimer définitivement ce message et son média ?")) return;
-
-    if (publicId && publicId !== "null" && publicId !== "") {
-        try {
-            // Si l'URL contient "video", c'est le compte dn3vf0mhm
-            // Sinon c'est dtkssnhub
-            const isVideo = publicId.includes('video') || publicId.match(/video/i);
-            const targetAccount = isVideo ? "videos" : "photos";
-
-            await fetch('https://jukfjoljkaoeicopjuwo.supabase.co/functions/v1/delete-cloudinary-media', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${SUPABASE_KEY}`
-                },
-                body: JSON.stringify({ 
-                    public_id: publicId,
-                    resource_type: isVideo ? "video" : "image",
-                    account: targetAccount 
-                })
-            });
-        } catch (err) {
-            console.error("Erreur suppression Cloudinary:", err);
-        }
-    }
-
-    const { error } = await _supabase.from(table).delete().eq('id', id);
-    if (error) {
-        alert("Erreur base de données.");
-    } else {
-        alert("Supprimé avec succès !");
-        table === 'messages' ? loadChat() : loadInbox();
-    }
 }
 
 // 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
