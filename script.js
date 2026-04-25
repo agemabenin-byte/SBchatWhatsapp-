@@ -314,22 +314,42 @@ async function executeSendPrivate() {
     }
 }
 
-// --- MESSAGES PRIVÉS (INBOX) - MISE À JOUR AFFICHAGE ---
+// --- MESSAGES PRIVÉS (INBOX) - OPTIMISÉ ---
 async function loadInbox() {
     const box = document.getElementById('inbox-list');
     if(!box) return;
-    box.innerHTML = "Chargement...";
+    box.innerHTML = "<div style='text-align:center; padding:20px;'>⏳ Chargement des messages...</div>";
 
-    const { data, error } = await _supabase
-        .from('inbox')
-        .select('*')
-        .eq('to_id', currentUser.id)
-        .order('id', {ascending: false});
-    
-    if(error) return box.innerHTML = "Erreur de chargement.";
-    box.innerHTML = "";
+    try {
+        // Optimisation : requête unique avec jointure pour éviter le N+1 problem
+        const { data, error } = await _supabase
+            .from('inbox')
+            .select(`
+                id, 
+                from_id, 
+                to_id, 
+                content, 
+                sender_phone, 
+                time,
+                image_url,
+                media_public_id,
+                profiles!inbox_from_id_fkey (
+                    is_admin
+                )
+            `)
+            .eq('to_id', currentUser.id)
+            .order('id', {ascending: false})
+            .limit(100); // Limiter à 100 messages pour éviter la surcharge
+        
+        if(error) throw error;
+        
+        box.innerHTML = "";
 
-    if(data && data.length > 0) {
+        if(!data || data.length === 0) { 
+            box.innerHTML = "<p style='text-align:center;'>Aucun message reçu.</p>"; 
+            return;
+        }
+
         // Récupérer tous les utilisateurs bloqués en une seule requête
         const { data: blockedUsers } = await _supabase
             .from('blocked_users')
@@ -338,20 +358,22 @@ async function loadInbox() {
         
         const blockedIds = new Set(blockedUsers?.map(b => b.blocked_id) || []);
         
-        // Filtrer les messages sans requêtes asynchrones
+        // Filtrer les messages sans boucles asynchrones
         const filteredData = data.filter(msg => !blockedIds.has(msg.from_id));
 
         // Trier les messages : admin en premier, puis les autres
         const sortedData = filteredData.sort((a, b) => {
-            // Vérifier si l'expéditeur est admin (utiliser le nouveau système is_admin)
-            const aIsAdmin = ADMINS_PHONES.includes(a.sender_phone);
-            const bIsAdmin = ADMINS_PHONES.includes(b.sender_phone);
+            // Utiliser la jointure profiles pour vérifier si admin
+            const aIsAdmin = a.profiles?.is_admin || ADMINS_PHONES.includes(a.sender_phone);
+            const bIsAdmin = b.profiles?.is_admin || ADMINS_PHONES.includes(b.sender_phone);
             
-            // Les messages admin en premier
             if (aIsAdmin && !bIsAdmin) return -1;
             if (!aIsAdmin && bIsAdmin) return 1;
-            return 0; // Garder l'ordre original si même statut
+            return 0;
         });
+
+        // Optimisation : utiliser DocumentFragment
+        const fragment = document.createDocumentFragment();
 
         for (const msg of sortedData) {
             const div = document.createElement('div');
@@ -361,7 +383,7 @@ async function loadInbox() {
 
             // --- DÉTECTION INTELLIGENTE DES MÉDIAS ---
             
-            // 1. Détection des Images (recherche l'extension n'importe où dans le lien)
+            // 1. Détection des Images
             if (messageAffiche.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
                 messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<img src="$1" style="max-width:100%; border-radius:8px; display:block; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">');
             } 
@@ -369,19 +391,16 @@ async function loadInbox() {
             else if (messageAffiche.match(/\.(mp4|mov)/i)) {
                 messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<video controls style="max-width:100%; border-radius:8px; margin-top:5px;"><source src="$1" type="video/mp4"></video>');
             }
-            // 3. Détection des autres fichiers joints (Cloudinary mais pas image/vidéo)
+            // 3. Détection des autres fichiers joints
             else if (messageAffiche.includes("res.cloudinary.com")) {
                 messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:8px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier joint</a>');
             }
 
             // Vérifier si on doit afficher la poubelle
-            const senderIsAdmin = ADMINS_PHONES.includes(msg.sender_phone);
+            const senderIsAdmin = msg.profiles?.is_admin || ADMINS_PHONES.includes(msg.sender_phone);
             const currentUserIsAdmin = currentProfile && currentProfile.is_admin;
             let deleteIcon = "";
 
-            // Conditions pour afficher la poubelle :
-            // - Si l'expéditeur n'est PAS admin OU
-            // - Si l'utilisateur actuel est admin
             if (!senderIsAdmin || currentUserIsAdmin) {
                 deleteIcon = `<span onclick="supprimerMessageInbox('${msg.id}', '${msg.image_url || ''}', '${msg.media_public_id || ''}', '${msg.sender_phone}')" style="cursor:pointer; color:red; margin-left:8px; font-size:12px;">🗑️</span>`;
             }
@@ -394,17 +413,22 @@ async function loadInbox() {
 
             // Style spécial pour les messages admin
             if (senderIsAdmin) {
-                div.style.borderLeftColor = "#FFD700"; // Or pour les messages admin
-                div.style.backgroundColor = "#FFF9E6"; // Fond clair pour les messages admin
+                div.style.borderLeftColor = "#FFD700";
+                div.style.backgroundColor = "#FFF9E6";
             }
 
             div.innerHTML = `<b>De: ${msg.sender_phone || 'Inconnu'}${senderIsAdmin ? ' ⭐' : ''}${deleteIcon}${blockButton}</b>
                              <div style="margin:5px 0; word-wrap: break-word;">${messageAffiche}</div>
                              <small style="color:gray; font-size:10px;">${msg.time}</small>`;
-            box.appendChild(div);
+            fragment.appendChild(div);
         }
-    } else { 
-        box.innerHTML = "<p style='text-align:center;'>Aucun message reçu.</p>"; 
+        
+        // Ajouter tout d'un coup
+        box.appendChild(fragment);
+        
+    } catch (err) {
+        console.error('Erreur loadInbox:', err);
+        box.innerHTML = "<p style='text-align:center; color:red;'>Erreur de chargement.</p>";
     }
 }
 
@@ -437,70 +461,88 @@ async function executeBroadcast() {
 }
 
 
-// --- LISTE DES MEMBRES ---
+// --- LISTE DES MEMBRES (OPTIMISÉE) ---
 async function loadMembers() {
     const list = document.getElementById('members-list');
     list.innerHTML = '<div style="text-align:center; padding:20px;">⏳ Chargement des membres...</div>';
     
-    const { data } = await _supabase.from('profiles').select('*');
-    if (!data) {
-        list.innerHTML = '<div style="text-align:center; padding:20px;">❌ Erreur de chargement</div>';
-        return;
-    }
-    
-    list.innerHTML = "";
-    const currentUserIsAdmin = currentProfile && currentProfile.is_admin;
-    
-    // Mettre à jour le compteur total de membres
-    const countElement = document.getElementById('total-members-count');
-    if (countElement) {
-        countElement.innerText = formatNumber(data.length);
-    }
-    
-    // Trier : administrateurs en premier, puis les autres
-    const sortedData = data.sort((a, b) => {
-        const aIsAdmin = a.is_admin || ADMINS_PHONES.includes(a.phone);
-        const bIsAdmin = b.is_admin || ADMINS_PHONES.includes(b.phone);
-        
-        if (aIsAdmin && !bIsAdmin) return -1;
-        if (!aIsAdmin && bIsAdmin) return 1;
-        return 0; // Garder l'ordre original si même statut
-    });
-    
-    sortedData.forEach(m => {
-        const div = document.createElement('div');
-        div.className = 'member-row';
-        div.style = "background:white; margin:10px; padding:15px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;";
-        
-        let statusInfo = "";
-        let actionButtons = `<button onclick="openPrivate('${m.id}', '${m.phone}')" style="background:#25D366; color:white; border:none; padding:8px 12px; border-radius:8px;">✉️</button>`;
-        
-        // Informations de statut
-        if (m.is_admin) {
-            statusInfo = '<span style="color:gold;">⭐ Admin</span>';
-        } else if (m.is_banned) {
-            statusInfo = '<span style="color:red;">🚫 Banni</span>';
+    try {
+        // Optimisation : sélectionner uniquement les champs nécessaires
+        const { data, error } = await _supabase
+            .from('profiles')
+            .select('id, phone, email, is_admin, is_banned')
+            .order('is_admin', { ascending: false });
+            
+        if (error) throw error;
+        if (!data || data.length === 0) {
+            list.innerHTML = '<div style="text-align:center; padding:20px;">❌ Aucun membre trouvé</div>';
+            return;
         }
         
-        // Icône de blocage pour les admins (uniquement pour les non-admins)
-        let blockIcon = "";
-        if (currentUserIsAdmin && !m.is_admin && !m.is_banned) {
-            blockIcon = `<span onclick="bloquerUtilisateur('${m.id}', '${m.phone}')" style="cursor:pointer; color:orange; margin-right:8px; font-size:16px;">🚫</span>`;
+        list.innerHTML = "";
+        const currentUserIsAdmin = currentProfile && currentProfile.is_admin;
+        
+        // Mettre à jour le compteur total de membres
+        const countElement = document.getElementById('total-members-count');
+        if (countElement) {
+            countElement.innerText = formatNumber(data.length);
         }
         
-        // Boutons d'action pour les admins
-        if (currentUserIsAdmin && !m.is_admin) {
-            if (m.is_banned) {
-                actionButtons += ` <button onclick="debannirUtilisateur('${m.id}', '${m.phone}')" style="background:green; color:white; border:none; padding:8px 12px; border-radius:8px; margin-left:5px;">✅ Débannir</button>`;
-            } else {
-                actionButtons += ` <button onclick="bannirUtilisateur('${m.id}', '${m.phone}')" style="background:red; color:white; border:none; padding:8px 12px; border-radius:8px; margin-left:5px;">🚫 Bannir</button>`;
+        // Optimisation : utiliser DocumentFragment pour éviter les reflows multiples
+        const fragment = document.createDocumentFragment();
+        
+        // Trier : administrateurs en premier, puis les autres
+        const sortedData = data.sort((a, b) => {
+            const aIsAdmin = a.is_admin || ADMINS_PHONES.includes(a.phone);
+            const bIsAdmin = b.is_admin || ADMINS_PHONES.includes(b.phone);
+            
+            if (aIsAdmin && !bIsAdmin) return -1;
+            if (!aIsAdmin && bIsAdmin) return 1;
+            return 0;
+        });
+        
+        sortedData.forEach(m => {
+            const div = document.createElement('div');
+            div.className = 'member-row';
+            div.style = "background:white; margin:5px; padding:8px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:nowrap;";
+            
+            let statusInfo = "";
+            let actionButtons = `<button onclick="openPrivate('${m.id}', '${m.phone}')" style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; white-space:nowrap;">✉️</button>`;
+            
+            // Informations de statut
+            if (m.is_admin) {
+                statusInfo = '<span style="color:gold;">⭐ Admin</span>';
+            } else if (m.is_banned) {
+                statusInfo = '<span style="color:red;">🚫 Banni</span>';
             }
-        }
+            
+            // Icône de blocage pour les admins (uniquement pour les non-admins)
+            let blockIcon = "";
+            if (currentUserIsAdmin && !m.is_admin && !m.is_banned) {
+                blockIcon = `<span onclick="bloquerUtilisateur('${m.id}', '${m.phone}')" style="cursor:pointer; color:orange; margin-right:5px; font-size:12px;">🚫</span>`;
+            }
+            
+            // Boutons d'action pour les admins
+            if (currentUserIsAdmin && !m.is_admin) {
+                if (m.is_banned) {
+                    actionButtons += ` <button onclick="debannirUtilisateur('${m.id}', '${m.phone}')" style="background:green; color:white; border:none; padding:4px 6px; border-radius:4px; margin-left:3px; font-size:11px; white-space:nowrap;">✅ Débloquer</button>`;
+                } else {
+                    actionButtons += ` <button onclick="bannirUtilisateur('${m.id}', '${m.phone}')" style="background:red; color:white; border:none; padding:4px 6px; border-radius:4px; margin-left:3px; font-size:11px; white-space:nowrap;">🚫 Bloquer</button>`;
+                }
+            }
+            
+            div.innerHTML = `<div style="font-size:12px;">${blockIcon}<b style="font-size:13px;">${m.phone}</b><br><small style="font-size:10px;">${m.email || ''}</small><br>${statusInfo}</div>
+                             <div style="display:flex; gap:3px; align-items:center; flex-shrink:0;">${actionButtons}</div>`;
+            fragment.appendChild(div);
+        });
         
-        div.innerHTML = `<div>${blockIcon}<b>${m.phone}</b><br><small>${m.email || ''}</small><br>${statusInfo}</div>
-                         <div>${actionButtons}</div>`;
-        list.appendChild(div);
-    });
+        // Ajouter tout d'un coup pour éviter les reflows
+        list.appendChild(fragment);
+        
+    } catch (error) {
+        console.error('Erreur loadMembers:', error);
+        list.innerHTML = '<div style="text-align:center; padding:20px; color:red;">❌ Erreur de chargement</div>';
+    }
 }
 
 // Action de CONNEXION pure
