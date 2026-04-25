@@ -382,17 +382,21 @@ async function loadInbox() {
             // Utiliser la nouvelle fonction de traitement du texte
             let messageAffiche = processMessageContent(msg.content || "");
 
-            // --- DÉTECTION INTELLIGENTE DES MÉDIAS ---
+            // --- DÉTECTION INTÉLLIGENTE DES MÉDIAS ---
             
-            // 1. Détection des Images
-            if (messageAffiche.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
+            // 1. Détection des Images Cloudinary
+            if (msg.image_url && msg.image_url.includes("cloudinary")) {
+                messageAffiche += `<img src="${msg.image_url}" style="max-width:100%; border-radius:8px; display:block; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">`;
+            }
+            // 2. Détection des URLs d'images dans le texte
+            else if (messageAffiche.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
                 messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<img src="$1" style="max-width:100%; border-radius:8px; display:block; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">');
             } 
-            // 2. Détection des Vidéos
+            // 3. Détection des Vidéos
             else if (messageAffiche.match(/\.(mp4|mov)/i)) {
                 messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<video controls style="max-width:100%; border-radius:8px; margin-top:5px;"><source src="$1" type="video/mp4"></video>');
             }
-            // 3. Détection des autres fichiers joints
+            // 4. Détection des autres fichiers joints Cloudinary
             else if (messageAffiche.includes("res.cloudinary.com")) {
                 messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:8px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier joint</a>');
             }
@@ -408,7 +412,7 @@ async function loadInbox() {
             }
             
             if (currentUserIsAdmin) {
-                shareIcon = `<span onclick="shareMessageInbox('${msg.id}', '${msg.sender_phone}', '${(msg.content || '').replace(/'/g, "\\'")}', '${msg.image_url || ''}')" style="cursor:pointer; color:blue; margin-left:8px; font-size:12px;">📤</span>`;
+                shareIcon = `<span onclick="shareMessageInbox('${msg.id}', '${msg.sender_phone}', '${(msg.content || '').replace(/'/g, "\\'")}', '${msg.image_url || ''}')" style="cursor:pointer; color:#25D366; margin-left:8px; font-size:14px;" title="Partager le message">⤴️</span>`;
             }
 
             // Bouton de blocage (uniquement pour les non-admins)
@@ -425,7 +429,7 @@ async function loadInbox() {
 
             div.innerHTML = `<b>De: ${msg.sender_phone || 'Inconnu'}${senderIsAdmin ? ' ⭐' : ''}${deleteIcon}${shareIcon}${blockButton}</b>
                              <div style="margin:5px 0; word-wrap: break-word;">${messageAffiche}</div>
-                             <small style="color:gray; font-size:10px;">${msg.time}</small>`;
+                             <small style="color:gray; font-size:10px; cursor: default; pointer-events: none;">${msg.time}</small>`;
             fragment.appendChild(div);
         }
         
@@ -615,7 +619,7 @@ function togglePass(id, icon) {
 function cancelReply() { replyToId = null; document.getElementById('reply-preview').style.display = 'none'; }
 async function handleLogout() { await _supabase.auth.signOut(); location.reload(); }
 
-// --- FONCTIONS DE FORMATAGE DU TEXTE ---
+// --- FONCTIONS DE FORMATAGE DU TEXTE (WYSIWYG) ---
 
 // Pour le groupe
 function toggleFormattingToolbar() {
@@ -629,6 +633,29 @@ function formatText(command, value = null) {
     const end = textarea.selectionEnd;
     const selectedText = textarea.value.substring(start, end);
     
+    if (!selectedText) {
+        // Si aucun texte n'est sélectionné, on insère le formatage pour le texte à venir
+        let placeholder = '';
+        switch(command) {
+            case 'bold': placeholder = '**texte en gras**'; break;
+            case 'italic': placeholder = '*texte en italique*'; break;
+            case 'underline': placeholder = '__texte souligné__'; break;
+            case 'color': placeholder = `<span style="color:${value}">texte coloré</span>`; break;
+        }
+        
+        textarea.value = textarea.value.substring(0, start) + placeholder + textarea.value.substring(end);
+        textarea.focus();
+        // Sélectionner le texte placeholder
+        const newStart = start;
+        const newEnd = start + placeholder.length;
+        textarea.setSelectionRange(newStart, newEnd);
+    } else {
+        // Appliquer le formatage au texte sélectionné
+        applyFormattingToText(textarea, start, end, selectedText, command, value);
+    }
+}
+
+function applyFormattingToText(textarea, start, end, selectedText, command, value) {
     let formattedText = '';
     
     switch(command) {
@@ -648,7 +675,7 @@ function formatText(command, value = null) {
     
     textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
     textarea.focus();
-    textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
+    textarea.setSelectionRange(start, start + formattedText.length);
 }
 
 // Pour la diffusion
@@ -663,6 +690,29 @@ function formatTextBroadcast(command, value = null) {
     const end = textarea.selectionEnd;
     const selectedText = textarea.value.substring(start, end);
     
+    if (!selectedText) {
+        // Si aucun texte n'est sélectionné, on insère le formatage pour le texte à venir
+        let placeholder = '';
+        switch(command) {
+            case 'bold': placeholder = '**texte en gras**'; break;
+            case 'italic': placeholder = '*texte en italique*'; break;
+            case 'underline': placeholder = '__texte souligné__'; break;
+            case 'color': placeholder = `<span style="color:${value}">texte coloré</span>`; break;
+        }
+        
+        textarea.value = textarea.value.substring(0, start) + placeholder + textarea.value.substring(end);
+        textarea.focus();
+        // Sélectionner le texte placeholder
+        const newStart = start;
+        const newEnd = start + placeholder.length;
+        textarea.setSelectionRange(newStart, newEnd);
+    } else {
+        // Appliquer le formatage au texte sélectionné
+        applyFormattingToTextBroadcast(textarea, start, end, selectedText, command, value);
+    }
+}
+
+function applyFormattingToTextBroadcast(textarea, start, end, selectedText, command, value) {
     let formattedText = '';
     
     switch(command) {
@@ -682,7 +732,7 @@ function formatTextBroadcast(command, value = null) {
     
     textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
     textarea.focus();
-    textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
+    textarea.setSelectionRange(start, start + formattedText.length);
 }
 
 // Pour l'inbox
@@ -697,6 +747,29 @@ function formatTextInbox(command, value = null) {
     const end = textarea.selectionEnd;
     const selectedText = textarea.value.substring(start, end);
     
+    if (!selectedText) {
+        // Si aucun texte n'est sélectionné, on insère le formatage pour le texte à venir
+        let placeholder = '';
+        switch(command) {
+            case 'bold': placeholder = '**texte en gras**'; break;
+            case 'italic': placeholder = '*texte en italique*'; break;
+            case 'underline': placeholder = '__texte souligné__'; break;
+            case 'color': placeholder = `<span style="color:${value}">texte coloré</span>`; break;
+        }
+        
+        textarea.value = textarea.value.substring(0, start) + placeholder + textarea.value.substring(end);
+        textarea.focus();
+        // Sélectionner le texte placeholder
+        const newStart = start;
+        const newEnd = start + placeholder.length;
+        textarea.setSelectionRange(newStart, newEnd);
+    } else {
+        // Appliquer le formatage au texte sélectionné
+        applyFormattingToTextInbox(textarea, start, end, selectedText, command, value);
+    }
+}
+
+function applyFormattingToTextInbox(textarea, start, end, selectedText, command, value) {
     let formattedText = '';
     
     switch(command) {
@@ -716,7 +789,7 @@ function formatTextInbox(command, value = null) {
     
     textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
     textarea.focus();
-    textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
+    textarea.setSelectionRange(start, start + formattedText.length);
 }
 
 // --- FONCTIONS D'ÉMOTICÔNES ---
@@ -812,8 +885,8 @@ function showShareDialog() {
         </div>
         ${window.messageToShare.image ? `<img src="${window.messageToShare.image}" style="max-width: 200px; border-radius: 5px;">` : ''}
         <h4>Choisir le destinataire:</h4>
-        <div id="share-members-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
-            <p style="text-align: center;">Chargement des membres...</p>
+        <div id="share-destinations-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
+            <div style="text-align: center; padding: 20px; color: #666;">⏳ Chargement des destinataires...</div>
         </div>
         <div style="margin-top: 15px; text-align: right;">
             <button onclick="this.closest('.modal-share').remove()" style="background: #ccc; border: none; padding: 8px 15px; border-radius: 5px; margin-right: 10px;">Annuler</button>
@@ -824,8 +897,8 @@ function showShareDialog() {
     modal.appendChild(dialog);
     document.body.appendChild(modal);
     
-    // Charger la liste des membres
-    loadMembersForShare();
+    // Charger la liste des destinataires
+    loadShareDestinations();
     
     // Fermer en cliquant à l'extérieur
     modal.addEventListener('click', (e) => {
@@ -835,13 +908,108 @@ function showShareDialog() {
     });
 }
 
-async function loadMembersForShare() {
+async function loadShareDestinations() {
     try {
-        const { data, error } = await _supabase
+        // Charger les membres
+        const { data: members, error: membersError } = await _supabase
             .from('profiles')
             .select('id, phone, is_admin')
-            .neq('id', currentUser.id);
+            .neq('id', currentUser.id)
+            .order('is_admin', { ascending: false });
         
+        if (membersError) throw membersError;
+        
+        const destinationsList = document.getElementById('share-destinations-list');
+        
+        if (!members || members.length === 0) {
+            destinationsList.innerHTML = '<p style="text-align: center; color: #666;">Aucun membre disponible</p>';
+            return;
+        }
+        
+        // Créer le contenu HTML
+        let html = '';
+        
+        // Option pour partager dans le groupe
+        html += `
+            <div onclick="shareToGroup()" style="background: #25D366; color: white; padding: 10px; border-radius: 5px; margin-bottom: 10px; cursor: pointer; text-align: center;">
+                <strong>📢 Partager dans le groupe</strong>
+                <div style="font-size: 12px; opacity: 0.9;">Tous les membres verront ce message</div>
+            </div>
+        `;
+        
+        // Options pour les membres individuels
+        html += '<div style="margin-top: 10px; font-weight: bold; color: #666;">👥 Partager à un membre spécifique:</div>';
+        
+        members.forEach(member => {
+            const isAdmin = member.is_admin || ADMINS_PHONES.includes(member.phone);
+            html += `
+                <div onclick="shareToMember('${member.id}', '${member.phone}')" style="background: white; border: 1px solid #ddd; padding: 8px; border-radius: 5px; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>${member.phone}</strong>
+                        ${isAdmin ? '<span style="color: gold; margin-left: 5px;">⭐</span>' : ''}
+                    </div>
+                    <span style="color: #25D366; font-size: 12px;">✉️ Envoyer</span>
+                </div>
+            `;
+        });
+        
+        destinationsList.innerHTML = html;
+        
+    } catch (err) {
+        console.error('Erreur chargement destinataires:', err);
+        document.getElementById('share-destinations-list').innerHTML = 
+            '<p style="text-align: center; color: red;">Erreur de chargement des destinataires</p>';
+    }
+}
+
+async function shareToGroup() {
+    try {
+        const message = window.messageToShare;
+        
+        // Envoyer dans le groupe (table messages)
+        const { error } = await _supabase.from('messages').insert([{
+            sender_id: currentUser.id,
+            sender_phone: currentProfile.phone,
+            content: `📤 *Message partagé de ${message.sender}:*\n\n${message.content}`,
+            image_url: message.image,
+            time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
+        }]);
+        
+        if (error) throw error;
+        
+        alert('Message partagé dans le groupe avec succès!');
+        document.querySelector('.modal-share').remove();
+        
+    } catch (err) {
+        console.error('Erreur partage groupe:', err);
+        alert('Erreur lors du partage dans le groupe');
+    }
+}
+
+async function shareToMember(memberId, memberPhone) {
+    try {
+        const message = window.messageToShare;
+        
+        // Envoyer en message privé (table inbox)
+        const { error } = await _supabase.from('inbox').insert([{
+            from_id: currentUser.id,
+            to_id: memberId,
+            content: `📤 *Message partagé de ${message.sender}:*\n\n${message.content}`,
+            sender_phone: currentProfile.phone,
+            image_url: message.image,
+            time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
+        }]);
+        
+        if (error) throw error;
+        
+        alert(`Message partagé à ${memberPhone} avec succès!`);
+        document.querySelector('.modal-share').remove();
+        
+    } catch (err) {
+        console.error('Erreur partage membre:', err);
+        alert('Erreur lors du partage au membre');
+    }
+}
         if (error) throw error;
         
         const list = document.getElementById('share-members-list');
@@ -1029,7 +1197,7 @@ function renderMsg(m) {
     // Icônes pour les admins
     const currentUserIsAdmin = currentProfile && currentProfile.is_admin;
     const deleteIcon = currentUserIsAdmin ? `<span onclick="supprimerMessageGroupe('${m.id}', '${m.image_url || ''}', '${m.media_public_id || ''}')" style="cursor:pointer; color:red; margin-left:8px; font-size:12px;">🗑️</span>` : "";
-    const shareIcon = currentUserIsAdmin ? `<span onclick="shareMessage('${m.id}', '${m.sender_phone}', '${(m.content || '').replace(/'/g, "\\'")}', '${m.image_url || ''}')" style="cursor:pointer; color:blue; margin-left:8px; font-size:12px;">📤</span>` : "";
+    const shareIcon = currentUserIsAdmin ? `<span onclick="shareMessage('${m.id}', '${m.sender_phone}', '${(m.content || '').replace(/'/g, "\\'")}', '${m.image_url || ''}')" style="cursor:pointer; color:#25D366; margin-left:8px; font-size:14px;" title="Partager le message">⤴️</span>` : "";
 
     div.innerHTML = `<small><b>${m.sender_phone}</b>${deleteIcon}${shareIcon}</small>
                      ${mediaSupplementaire}
@@ -1052,6 +1220,7 @@ function addSwipeToReply(element, message) {
     let touchStartX = 0;
     let touchEndX = 0;
     let isSwiping = false;
+    let selectionText = '';
     
     element.addEventListener('touchstart', (e) => {
         touchStartX = e.changedTouches[0].screenX;
@@ -1059,20 +1228,9 @@ function addSwipeToReply(element, message) {
         element.style.transition = 'transform 0.2s ease-out';
     }, { passive: true });
     
-    element.addEventListener('touchmove', (e) => {
-        if (!isSwiping) return;
-        
-        const touchCurrentX = e.changedTouches[0].screenX;
-        const diffX = touchCurrentX - touchStartX;
-        
-        // Limiter le déplacement pour l'effet visuel
-        if (diffX > 0 && diffX < 100) {
-            element.style.transform = `translateX(${diffX}px)`;
-        }
-    }, { passive: true });
-    
     element.addEventListener('touchend', (e) => {
         if (!isSwiping) return;
+        
         isSwiping = false;
         
         touchEndX = e.changedTouches[0].screenX;
@@ -1088,18 +1246,26 @@ function addSwipeToReply(element, message) {
                 replyToMessage(message);
             }
         }
-    }, { passive: true });
+    });
     
-    // Support pour la souris (desktop)
+    // Support pour la souris (desktop) - AMÉLIORÉ POUR ÉVITER LES CONFLITS
     let mouseStartX = 0;
     let isMouseDown = false;
+    let hasMoved = false;
+    let selectionStartTime = 0;
     
     element.addEventListener('mousedown', (e) => {
+        // Vérifier si l'utilisateur veut sélectionner du texte
+        selectionText = window.getSelection().toString();
+        selectionStartTime = Date.now();
+        
         mouseStartX = e.clientX;
         isMouseDown = true;
+        hasMoved = false;
         element.style.transition = 'transform 0.2s ease-out';
-        element.style.cursor = 'grabbing';
-        e.preventDefault();
+        
+        // Ne pas empêcher le comportement par défaut pour permettre la sélection
+        // e.preventDefault();
     });
     
     element.addEventListener('mousemove', (e) => {
@@ -1107,24 +1273,37 @@ function addSwipeToReply(element, message) {
         
         const diffX = e.clientX - mouseStartX;
         
-        // Limiter le déplacement pour l'effet visuel
-        if (diffX > 0 && diffX < 100) {
-            element.style.transform = `translateX(${diffX}px)`;
+        // Si le mouvement est horizontal et significatif, c'est probablement un swipe
+        if (Math.abs(diffX) > 20) {
+            hasMoved = true;
+            element.style.cursor = 'grabbing';
+            
+            // Appliquer l'effet visuel seulement si c'est un mouvement horizontal dominant
+            if (diffX > 0 && diffX < 100) {
+                element.style.transform = `translateX(${diffX}px)`;
+            }
         }
     });
     
     element.addEventListener('mouseup', (e) => {
         if (!isMouseDown) return;
+        
         isMouseDown = false;
         element.style.cursor = '';
         
         const diffX = e.clientX - mouseStartX;
+        const timeDiff = Date.now() - selectionStartTime;
+        const currentSelection = window.getSelection().toString();
         
         // Réinitialiser la position
         element.style.transform = '';
         
-        // Si le swipe est suffisant vers la droite (au moins 50px)
-        if (diffX > 50) {
+        // Conditions pour déclencher le swipe :
+        // 1. Mouvement horizontal suffisant (>50px)
+        // 2. Temps court (<500ms) pour éviter les sélections lentes
+        // 3. Pas de texte sélectionné ou le texte sélectionné n'a pas changé
+        // 4. L'utilisateur a bien déplacé la souris (pas juste un clic)
+        if (diffX > 50 && timeDiff < 500 && currentSelection === selectionText && hasMoved) {
             // Ne pas répondre à ses propres messages
             if (message.sender_id !== currentUser.id) {
                 replyToMessage(message);
@@ -1159,10 +1338,23 @@ function replyToMessage(message) {
     }
     replyText.textContent = previewText;
     
+    // Rendre l'aperçu visible et s'assurer qu'il reste visible
     replyPreview.style.display = 'flex';
+    replyPreview.style.position = 'relative';
+    replyPreview.style.zIndex = '5';
     
     // Focus sur le champ de saisie
-    document.getElementById('msgInput').focus();
+    const msgInput = document.getElementById('msgInput');
+    msgInput.focus();
+    
+    // S'assurer que l'aperçu reste visible même pendant la saisie
+    msgInput.addEventListener('input', function keepReplyVisible() {
+        if (replyToId) {
+            replyPreview.style.display = 'flex';
+        } else {
+            msgInput.removeEventListener('input', keepReplyVisible);
+        }
+    });
     
     // Faire défiler jusqu'en bas
     const chatBox = document.getElementById('chat-box');
@@ -1185,13 +1377,29 @@ async function loadMessageTemplates() {
     list.innerHTML = '<div style="text-align:center; padding:20px;">⏳ Chargement des modèles...</div>';
     
     try {
+        // Créer la table si elle n'existe pas (fallback)
+        const { error: createError } = await _supabase.rpc('create_templates_table_if_not_exists');
+        if (createError && !createError.message.includes('already exists')) {
+            console.log('Table peut déjà exister, continuation...');
+        }
+        
         const { data, error } = await _supabase
             .from('message_templates')
             .select('*')
             .eq('created_by', currentUser.id)
             .order('created_at', { ascending: false });
         
-        if (error) throw error;
+        if (error) {
+            console.error('Erreur détaillée:', error);
+            // Si la table n'existe pas, on crée une version locale temporaire
+            if (error.code === 'PGRST116') {
+                list.innerHTML = '<div style="text-align:center; padding:20px; color:orange;">⚠️ Table en cours de création. Veuillez réessayer dans quelques instants...</div>';
+                // Tentative de création de table
+                setTimeout(() => loadMessageTemplates(), 2000);
+                return;
+            }
+            throw error;
+        }
         
         list.innerHTML = '';
         
@@ -1347,11 +1555,17 @@ async function saveTemplate() {
             title: title,
             content: content,
             image_url: imageUrl,
-            created_by: currentUser.id,
-            created_at: new Date().toISOString()
+            created_by: currentUser.id
         }]);
         
-        if (error) throw error;
+        if (error) {
+            console.error('Erreur détaillée:', error);
+            if (error.code === 'PGRST116') {
+                alert('La table des modèles est en cours de création. Veuillez réessayer dans quelques instants.');
+                return;
+            }
+            throw error;
+        }
         
         alert('Modèle créé avec succès!');
         document.querySelector('.modal-template').remove();
