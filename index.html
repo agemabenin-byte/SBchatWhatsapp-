@@ -79,6 +79,7 @@
             <div id="adminDropdown" class="dropdown-content">
                 <button onclick="showView('page-members')">👥 Liste des membres</button>
                 <button onclick="showView('page-broadcast')">📢 Diffusion à tous</button>
+                <button onclick="showMessageTemplates()" id="templates-btn" style="display:none;">📋 Modèles Messages - Catalogues</button>
                 <button onclick="exporterContacts()">📥 Exporter EXCEL (XLS)</button>
                 <button onclick="handleLogout()" style="color:red;">🚪 Déconnexion</button>
             </div>
@@ -95,7 +96,23 @@
         </div>
         
         <div class="input-area-container">
+<!-- Barre d'outils de formatage -->
+<div class="formatting-toolbar" id="formatting-toolbar" style="display:none;">
+    <button onclick="formatText('bold')" title="Gras"><b>B</b></button>
+    <button onclick="formatText('italic')" title="Italique"><i>I</i></button>
+    <button onclick="formatText('underline')" title="Souligner"><u>U</u></button>
+    <div class="color-picker">
+        <button onclick="formatText('color', 'blue')" style="background:blue; color:white;" title="Bleu">A</button>
+        <button onclick="formatText('color', 'black')" style="background:black; color:white;" title="Noir">A</button>
+        <button onclick="formatText('color', 'red')" style="background:red; color:white;" title="Rouge">A</button>
+        <button onclick="formatText('color', 'yellow')" style="background:yellow; color:black;" title="Jaune">A</button>
+        <button onclick="formatText('color', 'green')" style="background:green; color:white;" title="Vert">A</button>
+    </div>
+    <button onclick="toggleEmojiPicker()" title="Émoticônes">😊</button>
+</div>
+
 <div class="input-area">
+    <button onclick="toggleFormattingToolbar()" class="format-btn" title="Formatage">🎨</button>
     <label for="file-input" class="file-label">📷</label>
     <input type="file" id="file-input" accept="image/*" style="display:none;" onchange="handleFileSelect()">
     
@@ -114,7 +131,25 @@
         <b>Diffusion à tous</b>
     </div>
     <div class="editor-container">
-        <textarea id="broadcast-msg" placeholder="Message aux membres..." style="width:90%; height:150px; padding:10px; border-radius:10px;"></textarea>
+<!-- Barre d'outils de formatage pour diffusion -->
+<div class="formatting-toolbar" id="broadcast-formatting-toolbar" style="display:none; margin-bottom:10px;">
+    <button onclick="formatTextBroadcast('bold')" title="Gras"><b>B</b></button>
+    <button onclick="formatTextBroadcast('italic')" title="Italique"><i>I</i></button>
+    <button onclick="formatTextBroadcast('underline')" title="Souligner"><u>U</u></button>
+    <div class="color-picker">
+        <button onclick="formatTextBroadcast('color', 'blue')" style="background:blue; color:white;" title="Bleu">A</button>
+        <button onclick="formatTextBroadcast('color', 'black')" style="background:black; color:white;" title="Noir">A</button>
+        <button onclick="formatTextBroadcast('color', 'red')" style="background:red; color:white;" title="Rouge">A</button>
+        <button onclick="formatTextBroadcast('color', 'yellow')" style="background:yellow; color:black;" title="Jaune">A</button>
+        <button onclick="formatTextBroadcast('color', 'green')" style="background:green; color:white;" title="Vert">A</button>
+    </div>
+    <button onclick="toggleEmojiPickerBroadcast()" title="Émoticônes">😊</button>
+</div>
+
+        <div style="display: flex; gap: 10px; align-items: center; width:90%;">
+            <button onclick="toggleFormattingToolbarBroadcast()" class="format-btn" title="Formatage">🎨</button>
+            <textarea id="broadcast-msg" placeholder="Message aux membres..." style="flex:1; height:150px; padding:10px; border-radius:10px;"></textarea>
+        </div>
         
         <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 10px;">
             <label for="bc-photo-input" style="cursor:pointer; font-size:24px;">📷</label>
@@ -157,7 +192,26 @@
         </div>
 <div class="editor-container">
     <p>Envoyer à : <b id="dest-display"></b></p>
-    <textarea id="edit-msg" placeholder="Message privé..." style="width:90%; height:100px; padding:10px; border-radius:10px;"></textarea>
+    
+<!-- Barre d'outils de formatage pour inbox -->
+<div class="formatting-toolbar" id="inbox-formatting-toolbar" style="display:none; margin-bottom:10px;">
+    <button onclick="formatTextInbox('bold')" title="Gras"><b>B</b></button>
+    <button onclick="formatTextInbox('italic')" title="Italique"><i>I</i></button>
+    <button onclick="formatTextInbox('underline')" title="Souligner"><u>U</u></button>
+    <div class="color-picker">
+        <button onclick="formatTextInbox('color', 'blue')" style="background:blue; color:white;" title="Bleu">A</button>
+        <button onclick="formatTextInbox('color', 'black')" style="background:black; color:white;" title="Noir">A</button>
+        <button onclick="formatTextInbox('color', 'red')" style="background:red; color:white;" title="Rouge">A</button>
+        <button onclick="formatTextInbox('color', 'yellow')" style="background:yellow; color:black;" title="Jaune">A</button>
+        <button onclick="formatTextInbox('color', 'green')" style="background:green; color:white;" title="Vert">A</button>
+    </div>
+    <button onclick="toggleEmojiPickerInbox()" title="Émoticônes">😊</button>
+</div>
+
+    <div style="display: flex; gap: 10px; align-items: center; width:90%;">
+        <button onclick="toggleFormattingToolbarInbox()" class="format-btn" title="Formatage">🎨</button>
+        <textarea id="edit-msg" placeholder="Message privé..." style="flex:1; height:100px; padding:10px; border-radius:10px;"></textarea>
+    </div>
     
     <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 10px;">
         <label for="inbox-photo-input" style="cursor:pointer; font-size:24px;">📷</label>
@@ -170,6 +224,87 @@
     <button onclick="executeSendPrivate()" style="width:90%;">ENVOYER</button>
 </div>
     </div>
+
+    <div id="page-templates" class="page" style="display:none;">
+        <div class="header">
+            <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
+            <div style="flex:1; display:flex; justify-content:center; align-items:center; padding:0 60px;">
+                <b>Modèles Messages - Catalogues</b>
+            </div>
+            <button onclick="toggleCreateTemplate()" style="background:white; color:#25D366; border:none; padding:5px 10px; border-radius:5px; font-size:12px; position:absolute; right:20px;">+ Nouveau</button>
+        </div>
+        
+        <div id="templates-list" class="messages" style="padding:10px;">
+            <div style="text-align:center; padding:20px;">⏳ Chargement des modèles...</div>
+        </div>
+    </div>
+
+    <!-- Sélecteur d'émoticônes -->
+<div id="emoji-picker" class="emoji-picker">
+    <div class="emoji-category">Informatique</div>
+    <div class="emoji-grid">
+        <button class="emoji-btn" onclick="insertEmoji('💻')">💻</button>
+        <button class="emoji-btn" onclick="insertEmoji('🖥️')">🖥️</button>
+        <button class="emoji-btn" onclick="insertEmoji('⌨️')">⌨️</button>
+        <button class="emoji-btn" onclick="insertEmoji('🖱️')">🖱️</button>
+        <button class="emoji-btn" onclick="insertEmoji('📱')">📱</button>
+        <button class="emoji-btn" onclick="insertEmoji('💾')">💾</button>
+        <button class="emoji-btn" onclick="insertEmoji('💿')">💿</button>
+        <button class="emoji-btn" onclick="insertEmoji('📀')">📀</button>
+        <button class="emoji-btn" onclick="insertEmoji('🖨️')">🖨️</button>
+        <button class="emoji-btn" onclick="insertEmoji('📠')">📠</button>
+        <button class="emoji-btn" onclick="insertEmoji('📡')">📡</button>
+        <button class="emoji-btn" onclick="insertEmoji('📞')">📞</button>
+    </div>
+    
+    <div class="emoji-category">Cœurs</div>
+    <div class="emoji-grid">
+        <button class="emoji-btn" onclick="insertEmoji('❤️')">❤️</button>
+        <button class="emoji-btn" onclick="insertEmoji('💚')">💚</button>
+        <button class="emoji-btn" onclick="insertEmoji('💛')">💛</button>
+        <button class="emoji-btn" onclick="insertEmoji('💗')">💗</button>
+        <button class="emoji-btn" onclick="insertEmoji('💓')">💓</button>
+        <button class="emoji-btn" onclick="insertEmoji('💕')">💕</button>
+        <button class="emoji-btn" onclick="insertEmoji('💖')">💖</button>
+        <button class="emoji-btn" onclick="insertEmoji('💘')">💘</button>
+        <button class="emoji-btn" onclick="insertEmoji('💝')">💝</button>
+        <button class="emoji-btn" onclick="insertEmoji('💞')">💞</button>
+        <button class="emoji-btn" onclick="insertEmoji('💟')">💟</button>
+        <button class="emoji-btn" onclick="insertEmoji('💌')">💌</button>
+    </div>
+    
+    <div class="emoji-category">Bureautique</div>
+    <div class="emoji-grid">
+        <button class="emoji-btn" onclick="insertEmoji('📌')">📌</button>
+        <button class="emoji-btn" onclick="insertEmoji('📍')">📍</button>
+        <button class="emoji-btn" onclick="insertEmoji('📎')">📎</button>
+        <button class="emoji-btn" onclick="insertEmoji('🖇️')">🖇️</button>
+        <button class="emoji-btn" onclick="insertEmoji('📏')">📏</button>
+        <button class="emoji-btn" onclick="insertEmoji('📐')">📐</button>
+        <button class="emoji-btn" onclick="insertEmoji('✂️')">✂️</button>
+        <button class="emoji-btn" onclick="insertEmoji('📝')">📝</button>
+        <button class="emoji-btn" onclick="insertEmoji('📄')">📄</button>
+        <button class="emoji-btn" onclick="insertEmoji('📃')">📃</button>
+        <button class="emoji-btn" onclick="insertEmoji('📋')">📋</button>
+        <button class="emoji-btn" onclick="insertEmoji('📁')">📁</button>
+    </div>
+    
+    <div class="emoji-category">Divers</div>
+    <div class="emoji-grid">
+        <button class="emoji-btn" onclick="insertEmoji('🌍')">🌍</button>
+        <button class="emoji-btn" onclick="insertEmoji('🌐')">🌐</button>
+        <button class="emoji-btn" onclick="insertEmoji('⭐')">⭐</button>
+        <button class="emoji-btn" onclick="insertEmoji('✨')">✨</button>
+        <button class="emoji-btn" onclick="insertEmoji('🔥')">🔥</button>
+        <button class="emoji-btn" onclick="insertEmoji('✅')">✅</button>
+        <button class="emoji-btn" onclick="insertEmoji('❌')">❌</button>
+        <button class="emoji-btn" onclick="insertEmoji('⚠️')">⚠️</button>
+        <button class="emoji-btn" onclick="insertEmoji('🚀')">🚀</button>
+        <button class="emoji-btn" onclick="insertEmoji('💡')">💡</button>
+        <button class="emoji-btn" onclick="insertEmoji('🎯')">🎯</button>
+        <button class="emoji-btn" onclick="insertEmoji('🏆')">🏆</button>
+    </div>
+</div>
 
     <script src="cloudinary-videos-fichiers.js"></script>
     <script src="script.js" defer></script>
