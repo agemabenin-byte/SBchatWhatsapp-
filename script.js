@@ -379,7 +379,8 @@ async function loadInbox() {
             const div = document.createElement('div');
             div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
             
-            let messageAffiche = msg.content || "";
+            // Utiliser la nouvelle fonction de traitement du texte
+            let messageAffiche = processMessageContent(msg.content || "");
 
             // --- DÉTECTION INTELLIGENTE DES MÉDIAS ---
             
@@ -396,13 +397,18 @@ async function loadInbox() {
                 messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:8px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier joint</a>');
             }
 
-            // Vérifier si on doit afficher la poubelle
+            // Vérifier si on doit afficher la poubelle et le partage
             const senderIsAdmin = msg.profiles?.is_admin || ADMINS_PHONES.includes(msg.sender_phone);
             const currentUserIsAdmin = currentProfile && currentProfile.is_admin;
             let deleteIcon = "";
+            let shareIcon = "";
 
             if (!senderIsAdmin || currentUserIsAdmin) {
                 deleteIcon = `<span onclick="supprimerMessageInbox('${msg.id}', '${msg.image_url || ''}', '${msg.media_public_id || ''}', '${msg.sender_phone}')" style="cursor:pointer; color:red; margin-left:8px; font-size:12px;">🗑️</span>`;
+            }
+            
+            if (currentUserIsAdmin) {
+                shareIcon = `<span onclick="shareMessageInbox('${msg.id}', '${msg.sender_phone}', '${(msg.content || '').replace(/'/g, "\\'")}', '${msg.image_url || ''}')" style="cursor:pointer; color:blue; margin-left:8px; font-size:12px;">📤</span>`;
             }
 
             // Bouton de blocage (uniquement pour les non-admins)
@@ -417,7 +423,7 @@ async function loadInbox() {
                 div.style.backgroundColor = "#FFF9E6";
             }
 
-            div.innerHTML = `<b>De: ${msg.sender_phone || 'Inconnu'}${senderIsAdmin ? ' ⭐' : ''}${deleteIcon}${blockButton}</b>
+            div.innerHTML = `<b>De: ${msg.sender_phone || 'Inconnu'}${senderIsAdmin ? ' ⭐' : ''}${deleteIcon}${shareIcon}${blockButton}</b>
                              <div style="margin:5px 0; word-wrap: break-word;">${messageAffiche}</div>
                              <small style="color:gray; font-size:10px;">${msg.time}</small>`;
             fragment.appendChild(div);
@@ -609,6 +615,320 @@ function togglePass(id, icon) {
 function cancelReply() { replyToId = null; document.getElementById('reply-preview').style.display = 'none'; }
 async function handleLogout() { await _supabase.auth.signOut(); location.reload(); }
 
+// --- FONCTIONS DE FORMATAGE DU TEXTE ---
+
+// Pour le groupe
+function toggleFormattingToolbar() {
+    const toolbar = document.getElementById('formatting-toolbar');
+    toolbar.style.display = toolbar.style.display === 'none' ? 'flex' : 'none';
+}
+
+function formatText(command, value = null) {
+    const textarea = document.getElementById('msgInput');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+    
+    let formattedText = '';
+    
+    switch(command) {
+        case 'bold':
+            formattedText = `**${selectedText}**`;
+            break;
+        case 'italic':
+            formattedText = `*${selectedText}*`;
+            break;
+        case 'underline':
+            formattedText = `__${selectedText}__`;
+            break;
+        case 'color':
+            formattedText = `<span style="color:${value}">${selectedText}</span>`;
+            break;
+    }
+    
+    textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+    textarea.focus();
+    textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
+}
+
+// Pour la diffusion
+function toggleFormattingToolbarBroadcast() {
+    const toolbar = document.getElementById('broadcast-formatting-toolbar');
+    toolbar.style.display = toolbar.style.display === 'none' ? 'flex' : 'none';
+}
+
+function formatTextBroadcast(command, value = null) {
+    const textarea = document.getElementById('broadcast-msg');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+    
+    let formattedText = '';
+    
+    switch(command) {
+        case 'bold':
+            formattedText = `**${selectedText}**`;
+            break;
+        case 'italic':
+            formattedText = `*${selectedText}*`;
+            break;
+        case 'underline':
+            formattedText = `__${selectedText}__`;
+            break;
+        case 'color':
+            formattedText = `<span style="color:${value}">${selectedText}</span>`;
+            break;
+    }
+    
+    textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+    textarea.focus();
+    textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
+}
+
+// Pour l'inbox
+function toggleFormattingToolbarInbox() {
+    const toolbar = document.getElementById('inbox-formatting-toolbar');
+    toolbar.style.display = toolbar.style.display === 'none' ? 'flex' : 'none';
+}
+
+function formatTextInbox(command, value = null) {
+    const textarea = document.getElementById('edit-msg');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+    
+    let formattedText = '';
+    
+    switch(command) {
+        case 'bold':
+            formattedText = `**${selectedText}**`;
+            break;
+        case 'italic':
+            formattedText = `*${selectedText}*`;
+            break;
+        case 'underline':
+            formattedText = `__${selectedText}__`;
+            break;
+        case 'color':
+            formattedText = `<span style="color:${value}">${selectedText}</span>`;
+            break;
+    }
+    
+    textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+    textarea.focus();
+    textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
+}
+
+// --- FONCTIONS D'ÉMOTICÔNES ---
+
+let currentEmojiTarget = 'msgInput'; // Par défaut, cible le groupe
+
+function toggleEmojiPicker() {
+    currentEmojiTarget = 'msgInput';
+    const picker = document.getElementById('emoji-picker');
+    picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleEmojiPickerBroadcast() {
+    currentEmojiTarget = 'broadcast-msg';
+    const picker = document.getElementById('emoji-picker');
+    picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleEmojiPickerInbox() {
+    currentEmojiTarget = 'edit-msg';
+    const picker = document.getElementById('emoji-picker');
+    picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+}
+
+function insertEmoji(emoji) {
+    const textarea = document.getElementById(currentEmojiTarget);
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    
+    textarea.value = textarea.value.substring(0, start) + emoji + textarea.value.substring(end);
+    textarea.focus();
+    textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+    
+    // Fermer le picker
+    document.getElementById('emoji-picker').style.display = 'none';
+}
+
+// --- FONCTIONS DE PARTAGE ---
+
+function shareMessage(messageId, senderPhone, content, imageUrl) {
+    if (!currentProfile || !currentProfile.is_admin) {
+        alert("Fonction réservée aux administrateurs");
+        return;
+    }
+    
+    // Stocker le message à partager
+    window.messageToShare = {
+        id: messageId,
+        sender: senderPhone,
+        content: content,
+        image: imageUrl
+    };
+    
+    // Afficher le dialogue de partage
+    showShareDialog();
+}
+
+function shareMessageInbox(messageId, senderPhone, content, imageUrl) {
+    shareMessage(messageId, senderPhone, content, imageUrl);
+}
+
+function showShareDialog() {
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        max-width: 90%;
+        max-height: 80%;
+        overflow-y: auto;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    `;
+    
+    dialog.innerHTML = `
+        <h3 style="margin-top: 0; color: #25D366;">Partager ce message</h3>
+        <p><strong>Message de:</strong> ${window.messageToShare.sender}</p>
+        <div style="background: #f5f5f5; padding: 10px; border-radius: 5px; margin: 10px 0; max-height: 100px; overflow-y: auto;">
+            ${window.messageToShare.content}
+        </div>
+        ${window.messageToShare.image ? `<img src="${window.messageToShare.image}" style="max-width: 200px; border-radius: 5px;">` : ''}
+        <h4>Choisir le destinataire:</h4>
+        <div id="share-members-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
+            <p style="text-align: center;">Chargement des membres...</p>
+        </div>
+        <div style="margin-top: 15px; text-align: right;">
+            <button onclick="this.closest('.modal-share').remove()" style="background: #ccc; border: none; padding: 8px 15px; border-radius: 5px; margin-right: 10px;">Annuler</button>
+        </div>
+    `;
+    
+    modal.className = 'modal-share';
+    modal.appendChild(dialog);
+    document.body.appendChild(modal);
+    
+    // Charger la liste des membres
+    loadMembersForShare();
+    
+    // Fermer en cliquant à l'extérieur
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+}
+
+async function loadMembersForShare() {
+    try {
+        const { data, error } = await _supabase
+            .from('profiles')
+            .select('id, phone, is_admin')
+            .neq('id', currentUser.id);
+        
+        if (error) throw error;
+        
+        const list = document.getElementById('share-members-list');
+        if (!list) return;
+        
+        list.innerHTML = '';
+        
+        data.forEach(member => {
+            const memberDiv = document.createElement('div');
+            memberDiv.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 8px;
+                border-bottom: 1px solid #eee;
+                cursor: pointer;
+            `;
+            
+            memberDiv.innerHTML = `
+                <span>${member.phone}${member.is_admin ? ' ⭐' : ''}</span>
+                <div>
+                    <button onclick="shareToGroup('${member.id}')" style="background: #25D366; color: white; border: none; padding: 4px 8px; border-radius: 3px; margin-right: 5px;">Groupe</button>
+                    <button onclick="shareToInbox('${member.id}', '${member.phone}')" style="background: #075E54; color: white; border: none; padding: 4px 8px; border-radius: 3px;">Inbox</button>
+                </div>
+            `;
+            
+            list.appendChild(memberDiv);
+        });
+        
+    } catch (err) {
+        console.error('Erreur chargement membres pour partage:', err);
+        const list = document.getElementById('share-members-list');
+        if (list) list.innerHTML = '<p style="color: red;">Erreur de chargement</p>';
+    }
+}
+
+async function shareToGroup(memberId) {
+    if (!window.messageToShare) return;
+    
+    try {
+        const messageData = {
+            sender_id: currentUser.id,
+            sender_phone: currentProfile.phone,
+            content: `*Message partagé de ${window.messageToShare.sender}:*\n\n${window.messageToShare.content}`,
+            image_url: window.messageToShare.image,
+            time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
+        };
+        
+        const { error } = await _supabase.from('messages').insert([messageData]);
+        
+        if (error) throw error;
+        
+        alert('Message partagé dans le groupe avec succès!');
+        document.querySelector('.modal-share').remove();
+        
+    } catch (err) {
+        console.error('Erreur partage groupe:', err);
+        alert('Erreur lors du partage dans le groupe');
+    }
+}
+
+async function shareToInbox(memberId, memberPhone) {
+    if (!window.messageToShare) return;
+    
+    try {
+        const messageData = {
+            from_id: currentUser.id,
+            to_id: memberId,
+            content: `*Message partagé de ${window.messageToShare.sender}:*\n\n${window.messageToShare.content}`,
+            sender_phone: currentProfile.phone,
+            image_url: window.messageToShare.image,
+            time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
+        };
+        
+        const { error } = await _supabase.from('inbox').insert([messageData]);
+        
+        if (error) throw error;
+        
+        alert(`Message partagé à ${memberPhone} avec succès!`);
+        document.querySelector('.modal-share').remove();
+        
+    } catch (err) {
+        console.error('Erreur partage inbox:', err);
+        alert('Erreur lors du partage en privé');
+    }
+}
+
 // --- FONCTIONS DE RECHERCHE ---
 function filterChatMessages() {
     const searchTerm = document.getElementById('chat-search').value.toLowerCase();
@@ -640,6 +960,30 @@ function filterMembers() {
     });
 }
 
+// --- FONCTION DE TRAITEMENT DU TEXTE ---
+function processMessageContent(content) {
+    if (!content) return '';
+    
+    // 1. Remplacer les retours à la ligne par <br>
+    let processed = content.replace(/\n/g, '<br>');
+    
+    // 2. Gérer le formatage markdown
+    // Gras : **texte** -> <b>texte</b>
+    processed = processed.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+    
+    // Italique : *texte* -> <i>texte</i>
+    processed = processed.replace(/\*(.*?)\*/g, '<i>$1</i>');
+    
+    // Soulignement : __texte__ -> <u>texte</u>
+    processed = processed.replace(/__(.*?)__/g, '<u>$1</u>');
+    
+    // 3. Rendre les URLs cliquables avec word-wrap
+    const urlRegex = /(https?:\/\/[^\s<]+)/g;
+    processed = processed.replace(urlRegex, '<a href="$1" target="_blank" style="color: #25D366; text-decoration: underline; word-break: break-all;">$1</a>');
+    
+    return processed;
+}
+
 // --- CHAT RENDER ---
 async function loadChat() {
     const { data } = await _supabase.from('messages').select('*').order('id', {ascending: true});
@@ -653,8 +997,15 @@ function renderMsg(m) {
     const box = document.getElementById('chat-box');
     const div = document.createElement('div');
     div.className = `msg ${m.sender_id === currentUser.id ? 'me' : 'other'}`;
+    
+    // Ajouter les données du message pour le swipe
+    div.dataset.messageId = m.id;
+    div.dataset.senderPhone = m.sender_phone;
+    div.dataset.content = m.content || '';
+    div.dataset.imageUrl = m.image_url || '';
 
-    let contenuFinal = m.content || '';
+    // Utiliser la nouvelle fonction de traitement du texte
+    let contenuFinal = processMessageContent(m.content || '');
 
     // Détection Vidéo dans le texte
     if (contenuFinal.includes('.mp4') || contenuFinal.includes('.mov')) {
@@ -675,14 +1026,18 @@ function renderMsg(m) {
          mediaSupplementaire = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px;">`;
     }
 
-    // Icône de poubelle pour suppression (uniquement pour les admins)
+    // Icônes pour les admins
     const currentUserIsAdmin = currentProfile && currentProfile.is_admin;
     const deleteIcon = currentUserIsAdmin ? `<span onclick="supprimerMessageGroupe('${m.id}', '${m.image_url || ''}', '${m.media_public_id || ''}')" style="cursor:pointer; color:red; margin-left:8px; font-size:12px;">🗑️</span>` : "";
+    const shareIcon = currentUserIsAdmin ? `<span onclick="shareMessage('${m.id}', '${m.sender_phone}', '${(m.content || '').replace(/'/g, "\\'")}', '${m.image_url || ''}')" style="cursor:pointer; color:blue; margin-left:8px; font-size:12px;">📤</span>` : "";
 
-    div.innerHTML = `<small><b>${m.sender_phone}</b>${deleteIcon}</small>
+    div.innerHTML = `<small><b>${m.sender_phone}</b>${deleteIcon}${shareIcon}</small>
                      ${mediaSupplementaire}
-                     <div>${contenuFinal}</div>
+                     <div style="word-wrap: break-word;">${contenuFinal}</div>
                      <small style="font-size:10px; display:block; text-align:right;">${m.time}</small>`;
+    
+    // Ajouter les événements de swipe
+    addSwipeToReply(div, m);
     
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
@@ -690,6 +1045,393 @@ function renderMsg(m) {
 
 function listenRealtime() {
     _supabase.channel('public:messages').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, p => renderMsg(p.new)).subscribe();
+}
+
+// --- FONCTION DE SWIPE POUR RÉPONDRE ---
+function addSwipeToReply(element, message) {
+    let touchStartX = 0;
+    let touchEndX = 0;
+    let isSwiping = false;
+    
+    element.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+        isSwiping = true;
+        element.style.transition = 'transform 0.2s ease-out';
+    }, { passive: true });
+    
+    element.addEventListener('touchmove', (e) => {
+        if (!isSwiping) return;
+        
+        const touchCurrentX = e.changedTouches[0].screenX;
+        const diffX = touchCurrentX - touchStartX;
+        
+        // Limiter le déplacement pour l'effet visuel
+        if (diffX > 0 && diffX < 100) {
+            element.style.transform = `translateX(${diffX}px)`;
+        }
+    }, { passive: true });
+    
+    element.addEventListener('touchend', (e) => {
+        if (!isSwiping) return;
+        isSwiping = false;
+        
+        touchEndX = e.changedTouches[0].screenX;
+        const diffX = touchEndX - touchStartX;
+        
+        // Réinitialiser la position
+        element.style.transform = '';
+        
+        // Si le swipe est suffisant vers la droite (au moins 50px)
+        if (diffX > 50) {
+            // Ne pas répondre à ses propres messages
+            if (message.sender_id !== currentUser.id) {
+                replyToMessage(message);
+            }
+        }
+    }, { passive: true });
+    
+    // Support pour la souris (desktop)
+    let mouseStartX = 0;
+    let isMouseDown = false;
+    
+    element.addEventListener('mousedown', (e) => {
+        mouseStartX = e.clientX;
+        isMouseDown = true;
+        element.style.transition = 'transform 0.2s ease-out';
+        element.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+    
+    element.addEventListener('mousemove', (e) => {
+        if (!isMouseDown) return;
+        
+        const diffX = e.clientX - mouseStartX;
+        
+        // Limiter le déplacement pour l'effet visuel
+        if (diffX > 0 && diffX < 100) {
+            element.style.transform = `translateX(${diffX}px)`;
+        }
+    });
+    
+    element.addEventListener('mouseup', (e) => {
+        if (!isMouseDown) return;
+        isMouseDown = false;
+        element.style.cursor = '';
+        
+        const diffX = e.clientX - mouseStartX;
+        
+        // Réinitialiser la position
+        element.style.transform = '';
+        
+        // Si le swipe est suffisant vers la droite (au moins 50px)
+        if (diffX > 50) {
+            // Ne pas répondre à ses propres messages
+            if (message.sender_id !== currentUser.id) {
+                replyToMessage(message);
+            }
+        }
+    });
+    
+    element.addEventListener('mouseleave', () => {
+        if (isMouseDown) {
+            isMouseDown = false;
+            element.style.transform = '';
+            element.style.cursor = '';
+        }
+    });
+}
+
+function replyToMessage(message) {
+    // Mettre en place la réponse
+    replyToId = message.id;
+    
+    // Afficher l'aperçu de réponse
+    const replyPreview = document.getElementById('reply-preview');
+    const replyUser = document.getElementById('reply-user');
+    const replyText = document.getElementById('reply-text');
+    
+    replyUser.textContent = `Réponse à ${message.sender_phone}`;
+    
+    // Limiter le texte de l'aperçu
+    let previewText = message.content || '';
+    if (previewText.length > 50) {
+        previewText = previewText.substring(0, 50) + '...';
+    }
+    replyText.textContent = previewText;
+    
+    replyPreview.style.display = 'flex';
+    
+    // Focus sur le champ de saisie
+    document.getElementById('msgInput').focus();
+    
+    // Faire défiler jusqu'en bas
+    const chatBox = document.getElementById('chat-box');
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// --- FONCTIONS POUR LES MODÈLES DE MESSAGES ---
+
+function showMessageTemplates() {
+    if (!currentProfile || !currentProfile.is_admin) {
+        alert("Fonction réservée aux administrateurs");
+        return;
+    }
+    showView('page-templates');
+    loadMessageTemplates();
+}
+
+async function loadMessageTemplates() {
+    const list = document.getElementById('templates-list');
+    list.innerHTML = '<div style="text-align:center; padding:20px;">⏳ Chargement des modèles...</div>';
+    
+    try {
+        const { data, error } = await _supabase
+            .from('message_templates')
+            .select('*')
+            .eq('created_by', currentUser.id)
+            .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        list.innerHTML = '';
+        
+        if (!data || data.length === 0) {
+            list.innerHTML = '<div style="text-align:center; padding:20px; color:#666;">Aucun modèle créé. Cliquez sur "+ Nouveau" pour commencer.</div>';
+            return;
+        }
+        
+        data.forEach(template => {
+            const templateDiv = document.createElement('div');
+            templateDiv.style.cssText = `
+                background: white;
+                margin: 10px;
+                padding: 15px;
+                border-radius: 10px;
+                border-left: 5px solid #25D366;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            `;
+            
+            const preview = template.content.length > 100 ? template.content.substring(0, 100) + '...' : template.content;
+            
+            templateDiv.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                    <h4 style="margin: 0; color: #25D366;">${template.title}</h4>
+                    <div>
+                        <button onclick="editTemplate('${template.id}')" style="background: #007bff; color: white; border: none; padding: 4px 8px; border-radius: 3px; margin-right: 5px; font-size: 12px;">✏️</button>
+                        <button onclick="deleteTemplate('${template.id}')" style="background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 12px;">🗑️</button>
+                    </div>
+                </div>
+                <div style="color: #666; font-size: 14px; margin-bottom: 10px; line-height: 1.4;">${preview}</div>
+                ${template.image_url ? `<img src="${template.image_url}" style="max-width: 100px; border-radius: 5px; margin-bottom: 10px;">` : ''}
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="useTemplateInGroup('${template.id}')" style="background: #25D366; color: white; border: none; padding: 6px 12px; border-radius: 5px; font-size: 12px;">Groupe</button>
+                    <button onclick="useTemplateInBroadcast('${template.id}')" style="background: #075E54; color: white; border: none; padding: 6px 12px; border-radius: 5px; font-size: 12px;">Diffusion</button>
+                    <button onclick="showTemplateShareDialog('${template.id}')" style="background: #ffc107; color: black; border: none; padding: 6px 12px; border-radius: 5px; font-size: 12px;">Partager</button>
+                </div>
+            `;
+            
+            list.appendChild(templateDiv);
+        });
+        
+    } catch (err) {
+        console.error('Erreur chargement modèles:', err);
+        list.innerHTML = '<div style="text-align:center; padding:20px; color:red;">Erreur de chargement</div>';
+    }
+}
+
+function toggleCreateTemplate() {
+    showCreateTemplateDialog();
+}
+
+function showCreateTemplateDialog() {
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        max-width: 90%;
+        max-height: 80%;
+        overflow-y: auto;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    `;
+    
+    dialog.innerHTML = `
+        <h3 style="margin-top: 0; color: #25D366;">Créer un modèle</h3>
+        <input type="text" id="template-title" placeholder="Titre du modèle" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px;">
+        <textarea id="template-content" placeholder="Contenu du message" style="width: 100%; height: 150px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px; resize: vertical;"></textarea>
+        <div style="margin-bottom: 10px;">
+            <label for="template-image" style="display: block; margin-bottom: 5px;">Image (optionnel):</label>
+            <input type="file" id="template-image" accept="image/*" style="width: 100%;">
+            <div id="template-image-preview" style="margin-top: 10px;"></div>
+        </div>
+        <div style="text-align: right;">
+            <button onclick="this.closest('.modal-template').remove()" style="background: #ccc; border: none; padding: 8px 15px; border-radius: 5px; margin-right: 10px;">Annuler</button>
+            <button onclick="saveTemplate()" style="background: #25D366; color: white; border: none; padding: 8px 15px; border-radius: 5px;">Enregistrer</button>
+        </div>
+    `;
+    
+    modal.className = 'modal-template';
+    modal.appendChild(dialog);
+    document.body.appendChild(modal);
+    
+    // Prévisualisation de l'image
+    document.getElementById('template-image').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        const preview = document.getElementById('template-image-preview');
+        
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.innerHTML = `<img src="${e.target.result}" style="max-width: 200px; border-radius: 5px;">`;
+            };
+            reader.readAsDataURL(file);
+        } else {
+            preview.innerHTML = '';
+        }
+    });
+    
+    // Fermer en cliquant à l'extérieur
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+}
+
+async function saveTemplate() {
+    const title = document.getElementById('template-title').value.trim();
+    const content = document.getElementById('template-content').value.trim();
+    const imageFile = document.getElementById('template-image').files[0];
+    
+    if (!title || !content) {
+        alert('Veuillez remplir le titre et le contenu');
+        return;
+    }
+    
+    try {
+        let imageUrl = null;
+        
+        // Upload de l'image si présente
+        if (imageFile) {
+            const formData = new FormData();
+            formData.append('file', imageFile);
+            formData.append('upload_preset', "chat_preset");
+            
+            const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            if (data.secure_url) {
+                imageUrl = data.secure_url;
+            }
+        }
+        
+        // Sauvegarder le modèle
+        const { error } = await _supabase.from('message_templates').insert([{
+            title: title,
+            content: content,
+            image_url: imageUrl,
+            created_by: currentUser.id,
+            created_at: new Date().toISOString()
+        }]);
+        
+        if (error) throw error;
+        
+        alert('Modèle créé avec succès!');
+        document.querySelector('.modal-template').remove();
+        loadMessageTemplates();
+        
+    } catch (err) {
+        console.error('Erreur création modèle:', err);
+        alert('Erreur lors de la création du modèle');
+    }
+}
+
+async function useTemplateInGroup(templateId) {
+    try {
+        const { data, error } = await _supabase
+            .from('message_templates')
+            .select('*')
+            .eq('id', templateId)
+            .single();
+        
+        if (error) throw error;
+        
+        // Remplir le champ de saisie du groupe
+        document.getElementById('msgInput').value = data.content;
+        
+        // Retourner au groupe
+        goBack();
+        
+        // Focus sur le champ de saisie
+        document.getElementById('msgInput').focus();
+        
+    } catch (err) {
+        console.error('Erreur utilisation modèle:', err);
+        alert('Erreur lors du chargement du modèle');
+    }
+}
+
+async function useTemplateInBroadcast(templateId) {
+    try {
+        const { data, error } = await _supabase
+            .from('message_templates')
+            .select('*')
+            .eq('id', templateId)
+            .single();
+        
+        if (error) throw error;
+        
+        // Remplir le champ de saisie de diffusion
+        document.getElementById('broadcast-msg').value = data.content;
+        
+        // Retourner à la diffusion
+        goBack();
+        showView('page-broadcast');
+        
+        // Focus sur le champ de saisie
+        document.getElementById('broadcast-msg').focus();
+        
+    } catch (err) {
+        console.error('Erreur utilisation modèle:', err);
+        alert('Erreur lors du chargement du modèle');
+    }
+}
+
+async function deleteTemplate(templateId) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce modèle?')) return;
+    
+    try {
+        const { error } = await _supabase
+            .from('message_templates')
+            .delete()
+            .eq('id', templateId);
+        
+        if (error) throw error;
+        
+        alert('Modèle supprimé avec succès!');
+        loadMessageTemplates();
+        
+    } catch (err) {
+        console.error('Erreur suppression modèle:', err);
+        alert('Erreur lors de la suppression du modèle');
+    }
 }
 
 async function handleForgotPassword() {
@@ -920,11 +1662,13 @@ function gererAffichageAdmin(userPhone) {
         const attachBC = document.getElementById('admin-bc-attach');
         const attachInbox = document.getElementById('admin-inbox-attach');
         const menuBtn = document.getElementById('adminMenuBtn');
+        const templatesBtn = document.getElementById('templates-btn');
 
         if (attachGroup) attachGroup.style.display = 'inline-block';
         if (attachBC) attachBC.style.display = 'inline-block';
         if (attachInbox) attachInbox.style.display = 'inline-block';
         if (menuBtn) menuBtn.style.display = 'block'; // S'assure que le menu ⋮ est visible
+        if (templatesBtn) templatesBtn.style.display = 'block'; // Afficher le bouton Modèles
     } else {
         // Cacher les boutons admin pour les non-admins
         const attachGroup = document.getElementById('admin-attach-btn');
