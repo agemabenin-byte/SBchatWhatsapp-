@@ -66,7 +66,7 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
     bottom: 0;
     left: 0;
     width: 100%;
-    z-index: 20;
+    z-index: 9998; /* Élevé mais inférieur aux boutons */
     /* Espace pour éviter que la barre système Android cache le bouton */
     padding-bottom: 15px;
 }
@@ -190,6 +190,8 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
     margin-bottom: 10px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     flex-wrap: wrap;
+    position: relative;
+    z-index: 9999; /* Très élevé pour passer au-dessus du menu Android */
 }
 
 .formatting-toolbar button {
@@ -222,6 +224,8 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
     align-items: center !important;
     justify-content: center !important;
     cursor: pointer !important;
+    position: relative;
+    z-index: 9999; /* Très élevé pour passer au-dessus du menu Android */
 }
 
 .color-picker {
@@ -247,7 +251,7 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
     border-radius: 10px;
     padding: 10px;
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    z-index: 1000;
+    z-index: 9999; /* Très élevé pour passer au-dessus du menu Android */
     max-width: 300px;
     max-height: 200px;
     overflow-y: auto;
