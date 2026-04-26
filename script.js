@@ -219,9 +219,8 @@ async function estUtilisateurBloque(senderId) {
 
 async function handleSend() {
     if(currentProfile && currentProfile.is_banned) return alert("Vous êtes banni du groupe !");
-    const input = document.getElementById('msgInput');
+    const content = getEditorContent('msgInput').trim();
     const fileInput = document.getElementById('file-input');
-    const content = input.value.trim();
     const file = fileInput.files[0];
     let url = null;
 
@@ -249,7 +248,7 @@ async function handleSend() {
         time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
     }]);
 
-    input.value = ""; fileInput.value = ""; cancelReply();
+    clearEditor('msgInput'); fileInput.value = ""; cancelReply();
 }
 
 // Cette fonction gère tes boutons "Retour" (la flèche ⬅ dans ton HTML)
@@ -290,7 +289,7 @@ function openPrivate(destId, destPhone) {
 }
 
 async function executeSendPrivate() {
-    const content = document.getElementById('edit-msg').value;
+    const content = getEditorContent('edit-msg');
     if(!content || !window.currentDestId) return alert("Message vide !");
 
     // On inclut maintenant le sender_phone puisque la colonne existe
@@ -307,7 +306,7 @@ async function executeSendPrivate() {
     } else {
         alert("Message privé envoyé !");
         // NETTOYAGE
-    document.getElementById('edit-msg').value = ""; // Vide le texte
+    clearEditor('edit-msg'); // Vide le texte
     document.getElementById('inbox-photo-input').value = ""; // Vide l'image sélectionnée
     document.getElementById('inbox-video-input').value = ""; // Vide le fichier sélectionné
         goBack();
@@ -412,7 +411,9 @@ async function loadInbox() {
             }
             
             if (currentUserIsAdmin) {
-                shareIcon = `<span onclick="shareMessageInbox('${msg.id}', '${msg.sender_phone}', '${(msg.content || '').replace(/'/g, "\\'")}', '${msg.image_url || ''}')" style="cursor:pointer; color:blue; margin-left:8px; font-size:12px;">⤴️</span>`;
+                // Encoder le contenu pour éviter les problèmes avec les URLs et caractères spéciaux
+                const contentEncoded = encodeURIComponent(msg.content || '');
+                shareIcon = `<span onclick="shareMessageInbox('${msg.id}', '${msg.sender_phone}', '${contentEncoded}', '${msg.image_url || ''}')" style="cursor:pointer; color:blue; margin-left:8px; font-size:12px;">⤴️</span>`;
             }
 
             // Bouton de blocage (uniquement pour les non-admins)
@@ -427,7 +428,10 @@ async function loadInbox() {
                 div.style.backgroundColor = "#FFF9E6";
             }
 
-            div.innerHTML = `<b>De: ${msg.sender_phone || 'Inconnu'}${senderIsAdmin ? ' ⭐' : ''}${deleteIcon}${shareIcon}${blockButton}</b>
+            div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;">
+                                 <b>De: ${msg.sender_phone || 'Inconnu'}${senderIsAdmin ? ' ⭐' : ''}</b>
+                                 <span>${deleteIcon}${shareIcon}${blockButton}</span>
+                             </div>
                              <div style="margin:5px 0; word-wrap: break-word;">${messageAffiche}</div>
                              <small style="color:gray; font-size:10px; pointer-events: none; cursor: default;">${msg.time}</small>`;
             fragment.appendChild(div);
@@ -444,7 +448,7 @@ async function loadInbox() {
 
 // --- DIFFUSION (BROADCAST) - RÉPARÉ ---
 async function executeBroadcast() {
-    const content = document.getElementById('broadcast-msg').value;
+    const content = getEditorContent('broadcast-msg');
     if(!content) return alert("Entrez un message !");
 
     const { data: allMembers, error: errMem } = await _supabase.from('profiles').select('id');
@@ -465,7 +469,7 @@ async function executeBroadcast() {
         alert("Erreur diffusion : " + error.message);
     } else {
         alert("Message diffusé avec succès !");
-        document.getElementById('broadcast-msg').value = "";
+        clearEditor('broadcast-msg');
         goBack();
     }
 }
@@ -611,7 +615,26 @@ function toggleMenu() {
     const d = document.getElementById('adminDropdown');
     d.style.display = (d.style.display === "block") ? "none" : "block";
 }
-function autoResize(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+function autoResize(el) { 
+    // Réinitialiser la hauteur pour mesurer correctement
+    el.style.height = 'auto'; 
+    
+    // Obtenir le contenu textuel pour mesurer
+    const textContent = el.textContent || el.innerText || '';
+    
+    // Si le contenu est vide ou très court, revenir à la hauteur minimale
+    if (textContent.trim().length === 0 || textContent.trim().length < 20) {
+        el.style.height = '20px';
+    } else {
+        // Sinon, ajuster la hauteur selon le contenu
+        el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+    }
+}
+
+// Fonction pour mettre à jour le compteur de caractères (optionnel)
+function updateCharCount() {
+    // Pas nécessaire pour l'instant mais peut être utile
+}
 function togglePass(id, icon) {
     const f = document.getElementById(id); f.type = (f.type === "password") ? "text" : "password";
     icon.innerText = (f.type === "password") ? "👁️" : "🔒";
@@ -634,60 +657,95 @@ function cancelReply() {
 }
 async function handleLogout() { await _supabase.auth.signOut(); location.reload(); }
 
-// --- FONCTIONS DE FORMATAGE DU TEXTE ---
+// --- FONCTIONS DE FORMATAGE WYSIWYG ---
 
-// Fonction utilitaire pour appliquer le formatage dans le textarea
+// Fonction pour appliquer le formatage directement dans le contenteditable
 function applyFormatting(targetId, command, value = null) {
-    const textarea = document.getElementById(targetId);
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = textarea.value.substring(start, end);
+    const editor = document.getElementById(targetId);
+    if (!editor) return;
     
-    if (!selectedText) {
-        // Si aucun texte n'est sélectionné, insérer le formatage vide
-        let formattedText = '';
+    editor.focus();
+    
+    try {
         switch(command) {
             case 'bold':
-                formattedText = '****';
+                document.execCommand('bold', false, null);
                 break;
             case 'italic':
-                formattedText = '**';
+                document.execCommand('italic', false, null);
                 break;
             case 'underline':
-                formattedText = '____';
+                document.execCommand('underline', false, null);
                 break;
             case 'color':
-                formattedText = `<span style="color:${value}"></span>`;
+                document.execCommand('foreColor', false, value);
+                break;
+            case 'justifyLeft':
+                document.execCommand('justifyLeft', false, null);
+                break;
+            case 'justifyCenter':
+                document.execCommand('justifyCenter', false, null);
+                break;
+            case 'justifyRight':
+                document.execCommand('justifyRight', false, null);
+                break;
+            case 'removeFormat':
+                document.execCommand('removeFormat', false, null);
                 break;
         }
-        
-        textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
-        // Positionner le curseur au milieu du formatage
-        const cursorPos = start + Math.floor(formattedText.length / 2);
-        textarea.focus();
-        textarea.setSelectionRange(cursorPos, cursorPos);
-    } else {
-        // Si du texte est sélectionné, appliquer le formatage
-        let formattedText = '';
-        switch(command) {
-            case 'bold':
-                formattedText = `**${selectedText}**`;
-                break;
-            case 'italic':
-                formattedText = `*${selectedText}*`;
-                break;
-            case 'underline':
-                formattedText = `__${selectedText}__`;
-                break;
-            case 'color':
-                formattedText = `<span style="color:${value}">${selectedText}</span>`;
-                break;
-        }
-        
-        textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
-        textarea.focus();
-        textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
+    } catch (e) {
+        console.error('Erreur de formatage:', e);
     }
+    
+    // Garder le focus
+    editor.focus();
+}
+
+// Fonction pour obtenir le contenu HTML de l'éditeur
+function getEditorContent(targetId) {
+    const editor = document.getElementById(targetId);
+    if (!editor) return '';
+    
+    // Obtenir le contenu HTML et le convertir en format de stockage
+    let html = editor.innerHTML;
+    
+    // Remplacer les balises HTML par notre format de stockage
+    html = html.replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**');
+    html = html.replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*');
+    html = html.replace(/<u[^>]*>(.*?)<\/u>/gi, '__$1__');
+    html = html.replace(/<span[^>]*style="color:[^"]*"[^>]*>(.*?)<\/span>/gi, '$1'); // Garder le texte sans couleur pour le stockage
+    html = html.replace(/<br[^>]*>/gi, '\n');
+    html = html.replace(/<div[^>]*>/gi, '\n').replace(/<\/div>/gi, '');
+    html = html.replace(/<p[^>]*>/gi, '').replace(/<\/p>/gi, '\n');
+    
+    // Nettoyer les HTML restants
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    return tempDiv.textContent || tempDiv.innerText || '';
+}
+
+// Fonction pour définir le contenu de l'éditeur
+function setEditorContent(targetId, content) {
+    const editor = document.getElementById(targetId);
+    if (!editor) return;
+    
+    // Convertir notre format de stockage en HTML
+    let html = content || '';
+    
+    // Remplacer notre format par HTML
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    html = html.replace(/__(.*?)__/g, '<u>$1</u>');
+    html = html.replace(/\n/g, '<br>');
+    
+    editor.innerHTML = html;
+}
+
+// Fonction pour vider l'éditeur
+function clearEditor(targetId) {
+    const editor = document.getElementById(targetId);
+    if (!editor) return;
+    editor.innerHTML = '';
 }
 
 // Pour le groupe
@@ -763,11 +821,20 @@ function shareMessage(messageId, senderPhone, content, imageUrl) {
         return;
     }
     
+    // Décoder le contenu s'il a été encodé
+    let decodedContent = content;
+    try {
+        decodedContent = decodeURIComponent(content);
+    } catch (e) {
+        // Si le décodage échoue, utiliser le contenu original
+        decodedContent = content;
+    }
+    
     // Stocker le message à partager
     window.messageToShare = {
         id: messageId,
         sender: senderPhone,
-        content: content,
+        content: decodedContent,
         image: imageUrl
     };
     
@@ -776,7 +843,9 @@ function shareMessage(messageId, senderPhone, content, imageUrl) {
 }
 
 function shareMessageInbox(messageId, senderPhone, content, imageUrl) {
-    shareMessage(messageId, senderPhone, content, imageUrl);
+    // Décoder le contenu s'il a été encodé
+    const decodedContent = decodeURIComponent(content);
+    shareMessage(messageId, senderPhone, decodedContent, imageUrl);
 }
 
 function showShareDialog() {
@@ -811,14 +880,14 @@ function showShareDialog() {
         <div style="background: #f5f5f5; padding: 10px; border-radius: 5px; margin: 10px 0; max-height: 100px; overflow-y: auto;">
             ${window.messageToShare.content}
         </div>
-        ${window.messageToShare.image ? `<img src="${window.messageToShare.image}" style="max-width: 200px; border-radius: 5px;">` : ''}
+        ${window.messageToShare.image ? `<img src="${window.messageToShare.image}" style="max-width: 50px; border-radius: 5px;">` : ''}
         <h4>Choisir le destinataire:</h4>
+        <input type="text" id="share-search" placeholder="🔍 Rechercher un membre..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px;" oninput="filterShareMembers()">
         <div id="share-members-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
             <div style="text-align: center; padding: 20px;">
-                <div style="background: #25D366; color: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; cursor: pointer;" onclick="shareToGroup()">
-                    <div style="font-size: 24px; margin-bottom: 5px;">👥</div>
-                    <div style="font-weight: bold;">Partager dans le groupe</div>
-                    <div style="font-size: 12px; opacity: 0.8;">Tous les membres verront ce message</div>
+                <div style="background: #25D366; color: white; padding: 5px 15px; border-radius: 8px; margin-bottom: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center;" onclick="shareToGroup()">
+                    <div style="font-size: 16px; margin-right: 8px;">👥</div>
+                    <div style="font-weight: bold; font-size: 12px;">Partager dans le groupe</div>
                 </div>
                 <p style="color: #666; margin: 15px 0;">OU</p>
                 <p style="color: #666;">Chargement des membres...</p>
@@ -993,6 +1062,20 @@ function filterMembers() {
     });
 }
 
+function filterShareMembers() {
+    const searchTerm = document.getElementById('share-search').value.toLowerCase();
+    const members = document.querySelectorAll('#share-members-list > div');
+    
+    members.forEach(member => {
+        // Ne pas cacher le premier élément (option de partage groupe)
+        if (member.querySelector('[onclick="shareToGroup()"]')) {
+            return;
+        }
+        const text = member.textContent.toLowerCase();
+        member.style.display = text.includes(searchTerm) ? 'flex' : 'none';
+    });
+}
+
 // --- FONCTION DE TRAITEMENT DU TEXTE ---
 function processMessageContent(content) {
     if (!content) return '';
@@ -1013,12 +1096,25 @@ function processMessageContent(content) {
     // 3. Gérer les couleurs : <span style="color:blue">texte</span> -> <span style="color:blue">texte</span>
     processed = processed.replace(/<span style="color:(.*?)">(.*?)<\/span>/g, '<span style="color:$1">$2</span>');
     
-    // 4. Rendre les URLs cliquables avec word-wrap
+    // 4. Détecter et traiter les médias AVANT les URLs régulières
+    // Images
+    processed = processed.replace(/(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)[^\s]*)/g, 
+        '<img src="$1" style="max-width:100%; border-radius:8px; display:block; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">');
+    
+    // Vidéos (sans autoplay)
+    processed = processed.replace(/(https?:\/\/[^\s]+\.(mp4|mov)[^\s]*)/g, 
+        '<video controls preload="metadata" style="max-width:100%; border-radius:8px; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);"><source src="$1" type="video/mp4"></video>');
+    
+    // Fichiers Cloudinary
+    processed = processed.replace(/(https?:\/\/res\.cloudinary\.com\/[^\s]+)/g, 
+        '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:8px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier joint</a>');
+    
+    // 5. Rendre les URLs cliquables (seulement celles qui ne sont pas des médias)
     const urlRegex = /(https?:\/\/[^\s<]+)/g;
     processed = processed.replace(urlRegex, function(url) {
-        // Vérifier si c'est une URL Cloudinary avec des médias
-        if (url.includes('cloudinary.com') || url.match(/\.(jpg|jpeg|png|gif|webp|mp4|mov|zip|exe|pdf)$/i)) {
-            return url; // Ne pas transformer en lien, laisser le traitement média s'en occuper
+        // Vérifier si c'est une URL de média déjà traitée
+        if (url.match(/\.(jpg|jpeg|png|gif|webp|mp4|mov|zip|exe|pdf)$/i) || url.includes('cloudinary.com')) {
+            return url; // Déjà traité ci-dessus
         }
         return `<a href="${url}" target="_blank" style="color: #25D366; text-decoration: underline; word-break: break-all;">${url}</a>`;
     });
@@ -1035,7 +1131,7 @@ async function loadChat() {
     box.scrollTop = box.scrollHeight;
 }
 
-function renderMsg(m) {
+async function renderMsg(m) {
     const box = document.getElementById('chat-box');
     const div = document.createElement('div');
     div.className = `msg ${m.sender_id === currentUser.id ? 'me' : 'other'}`;
@@ -1071,9 +1167,35 @@ function renderMsg(m) {
     // Icônes pour les admins
     const currentUserIsAdmin = currentProfile && currentProfile.is_admin;
     const deleteIcon = currentUserIsAdmin ? `<span onclick="supprimerMessageGroupe('${m.id}', '${m.image_url || ''}', '${m.media_public_id || ''}')" style="cursor:pointer; color:red; margin-left:8px; font-size:12px;">🗑️</span>` : "";
-    const shareIcon = currentUserIsAdmin ? `<span onclick="shareMessage('${m.id}', '${m.sender_phone}', '${(m.content || '').replace(/'/g, "\\'")}', '${m.image_url || ''}')" style="cursor:pointer; color:blue; margin-left:8px; font-size:12px;">⤴️</span>` : "";
+    const contentEncoded = encodeURIComponent(m.content || '');
+const shareIcon = currentUserIsAdmin ? `<span onclick="shareMessage('${m.id}', '${m.sender_phone}', '${contentEncoded}', '${m.image_url || ''}')" style="cursor:pointer; color:blue; margin-left:8px; font-size:12px;">⤴️</span>` : "";
+
+    // Ajouter l'aperçu de réponse si c'est une réponse
+    let replyPreview = "";
+    if (m.reply_to_id) {
+        try {
+            const { data: repliedMessage } = await _supabase
+                .from('messages')
+                .select('content, sender_phone, image_url')
+                .eq('id', m.reply_to_id)
+                .single();
+            
+            if (repliedMessage) {
+                const repliedContent = (repliedMessage.content || '').substring(0, 50) + (repliedMessage.content && repliedMessage.content.length > 50 ? '...' : '');
+                replyPreview = `
+                    <div style="background: rgba(37, 211, 102, 0.1); border-left: 3px solid #25D366; padding: 5px 8px; margin: 5px 0; border-radius: 3px; font-size: 11px;">
+                        <div style="font-weight: bold; color: #075E54;">En réponse à ${repliedMessage.sender_phone}:</div>
+                        <div style="color: #666;">${repliedContent}</div>
+                    </div>
+                `;
+            }
+        } catch (err) {
+            console.error('Erreur chargement message de réponse:', err);
+        }
+    }
 
     div.innerHTML = `<small><b>${m.sender_phone}</b>${deleteIcon}${shareIcon}</small>
+                     ${replyPreview}
                      ${mediaSupplementaire}
                      <div style="word-wrap: break-word;">${contenuFinal}</div>
                      <small style="font-size:10px; display:block; text-align:right; pointer-events: none; cursor: default;">${m.time}</small>`;
@@ -1086,7 +1208,9 @@ function renderMsg(m) {
 }
 
 function listenRealtime() {
-    _supabase.channel('public:messages').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, p => renderMsg(p.new)).subscribe();
+    _supabase.channel('public:messages').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, p => {
+        renderMsg(p.new);
+    }).subscribe();
 }
 
 // --- FONCTION DE SWIPE POUR RÉPONDRE ---
@@ -1309,6 +1433,16 @@ async function loadMessageTemplates() {
             
             const preview = template.content.length > 100 ? template.content.substring(0, 100) + '...' : template.content;
             
+            // Afficher le média (image ou vidéo)
+            let mediaDisplay = '';
+            if (template.image_url) {
+                if (template.media_type === 'video') {
+                    mediaDisplay = `<video src="${template.image_url}" style="max-width: 100px; border-radius: 5px; margin-bottom: 10px;" controls></video>`;
+                } else {
+                    mediaDisplay = `<img src="${template.image_url}" style="max-width: 100px; border-radius: 5px; margin-bottom: 10px;">`;
+                }
+            }
+            
             templateDiv.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                     <h4 style="margin: 0; color: #25D366;">${template.title}</h4>
@@ -1318,7 +1452,7 @@ async function loadMessageTemplates() {
                     </div>
                 </div>
                 <div style="color: #666; font-size: 14px; margin-bottom: 10px; line-height: 1.4;">${preview}</div>
-                ${template.image_url ? `<img src="${template.image_url}" style="max-width: 100px; border-radius: 5px; margin-bottom: 10px;">` : ''}
+                ${mediaDisplay}
                 <div style="display: flex; gap: 10px;">
                     <button onclick="useTemplateInGroup('${template.id}')" style="background: #25D366; color: white; border: none; padding: 6px 12px; border-radius: 5px; font-size: 12px;">Groupe</button>
                     <button onclick="useTemplateInBroadcast('${template.id}')" style="background: #075E54; color: white; border: none; padding: 6px 12px; border-radius: 5px; font-size: 12px;">Diffusion</button>
@@ -1374,6 +1508,11 @@ function showCreateTemplateDialog() {
             <input type="file" id="template-image" accept="image/*" style="width: 100%;">
             <div id="template-image-preview" style="margin-top: 10px;"></div>
         </div>
+        <div style="margin-bottom: 10px;">
+            <label for="template-video" style="display: block; margin-bottom: 5px;">Vidéo (optionnel):</label>
+            <input type="file" id="template-video" accept="video/*" style="width: 100%;">
+            <div id="template-video-preview" style="margin-top: 10px;"></div>
+        </div>
         <div style="text-align: right;">
             <button onclick="this.closest('.modal-template').remove()" style="background: #ccc; border: none; padding: 8px 15px; border-radius: 5px; margin-right: 10px;">Annuler</button>
             <button onclick="saveTemplate()" style="background: #25D366; color: white; border: none; padding: 8px 15px; border-radius: 5px;">Enregistrer</button>
@@ -1400,6 +1539,22 @@ function showCreateTemplateDialog() {
         }
     });
     
+    // Prévisualisation de la vidéo
+    document.getElementById('template-video').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        const preview = document.getElementById('template-video-preview');
+        
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.innerHTML = `<video src="${e.target.result}" style="max-width: 200px; border-radius: 5px;" controls></video>`;
+            };
+            reader.readAsDataURL(file);
+        } else {
+            preview.innerHTML = '';
+        }
+    });
+    
     // Fermer en cliquant à l'extérieur
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
@@ -1412,38 +1567,41 @@ async function saveTemplate() {
     const title = document.getElementById('template-title').value.trim();
     const content = document.getElementById('template-content').value.trim();
     const imageFile = document.getElementById('template-image').files[0];
+    const videoFile = document.getElementById('template-video').files[0];
     
     if (!title || !content) {
         alert('Veuillez remplir le titre et le contenu');
         return;
     }
     
+    if (imageFile && videoFile) {
+        alert('Veuillez choisir soit une image soit une vidéo, pas les deux');
+        return;
+    }
+    
     try {
-        let imageUrl = null;
+        let mediaUrl = null;
         
-        // Upload de l'image si présente
         if (imageFile) {
             const formData = new FormData();
             formData.append('file', imageFile);
             formData.append('upload_preset', "chat_preset");
-            
             const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
-                method: 'POST',
-                body: formData
+                method: 'POST', body: formData
             });
-            
             const data = await response.json();
-            if (data.secure_url) {
-                imageUrl = data.secure_url;
-            }
+            if (data.secure_url) mediaUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+        } else if (videoFile) {
+            mediaUrl = await uploadToVideoCloud(videoFile);
         }
         
-        // Sauvegarder le modèle
         const { error } = await _supabase.from('message_templates').insert([{
             title: title,
             content: content,
-            image_url: imageUrl,
-            created_by: currentUser.id
+            image_url: mediaUrl,
+            media_type: videoFile ? 'video' : 'image',
+            created_by: currentUser.id,
+            created_at: new Date().toISOString()
         }]);
         
         if (error) throw error;
@@ -1454,7 +1612,7 @@ async function saveTemplate() {
         
     } catch (err) {
         console.error('Erreur création modèle:', err);
-        alert('Erreur lors de la création du modèle');
+        alert('Erreur lors de la création: ' + err.message);
     }
 }
 
@@ -1468,8 +1626,8 @@ async function useTemplateInGroup(templateId) {
         
         if (error) throw error;
         
-        // Remplir le champ de saisie du groupe
-        document.getElementById('msgInput').value = data.content;
+        // Remplir le champ de saisie du groupe avec le nouveau système WYSIWYG
+        setEditorContent('msgInput', data.content);
         
         // Retourner au groupe
         goBack();
@@ -1493,19 +1651,144 @@ async function useTemplateInBroadcast(templateId) {
         
         if (error) throw error;
         
-        // Remplir le champ de saisie de diffusion
-        document.getElementById('broadcast-msg').value = data.content;
+        // Créer les messages de diffusion pour tous les membres
+        const { data: allMembers, error: errMem } = await _supabase.from('profiles').select('id');
+        if(errMem) return alert("Erreur membres: " + errMem.message);
         
-        // Retourner à la diffusion
-        goBack();
-        showView('page-broadcast');
-        
-        // Focus sur le champ de saisie
-        document.getElementById('broadcast-msg').focus();
+        // Préparation de l'envoi groupé
+        const messages = allMembers.map(member => ({
+            from_id: currentUser.id,
+            to_id: member.id,
+            content: data.content,
+            sender_phone: currentProfile.phone,
+            image_url: data.image_url,
+            time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
+        }));
+
+        const { error } = await _supabase.from('inbox').insert(messages);
+
+        if(error) {
+            alert("Erreur diffusion : " + error.message);
+        } else {
+            alert("Modèle diffusé avec succès à tous les membres!");
+        }
         
     } catch (err) {
-        console.error('Erreur utilisation modèle:', err);
+        console.error('Erreur diffusion modèle:', err);
+        alert('Erreur lors de la diffusion du modèle');
+    }
+}
+
+async function editTemplate(templateId) {
+    try {
+        const { data, error } = await _supabase
+            .from('message_templates')
+            .select('*')
+            .eq('id', templateId)
+            .single();
+        
+        if (error) throw error;
+        
+        // Créer le dialogue d'édition
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+        
+        const dialog = document.createElement('div');
+        dialog.style.cssText = `
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 90%;
+            max-height: 80%;
+            overflow-y: auto;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        `;
+        
+        dialog.innerHTML = `
+            <h3 style="margin-top: 0; color: #25D366;">Modifier le modèle</h3>
+            <input type="text" id="edit-template-title" value="${data.title}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px;">
+            <textarea id="edit-template-content" style="width: 100%; height: 150px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px; resize: vertical;">${data.content}</textarea>
+            <div style="text-align: right;">
+                <button onclick="this.closest('.modal-template').remove()" style="background: #ccc; border: none; padding: 8px 15px; border-radius: 5px; margin-right: 10px;">Annuler</button>
+                <button onclick="updateTemplate('${templateId}')" style="background: #25D366; color: white; border: none; padding: 8px 15px; border-radius: 5px;">Enregistrer</button>
+            </div>
+        `;
+        
+        modal.className = 'modal-template';
+        modal.appendChild(dialog);
+        document.body.appendChild(modal);
+        
+        // Fermer en cliquant à l'extérieur
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+        
+    } catch (err) {
+        console.error('Erreur édition modèle:', err);
         alert('Erreur lors du chargement du modèle');
+    }
+}
+
+async function updateTemplate(templateId) {
+    const title = document.getElementById('edit-template-title').value.trim();
+    const content = document.getElementById('edit-template-content').value.trim();
+    
+    if (!title || !content) {
+        alert('Veuillez remplir le titre et le contenu');
+        return;
+    }
+    
+    try {
+        const { error } = await _supabase
+            .from('message_templates')
+            .update({
+                title: title,
+                content: content,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', templateId);
+        
+        if (error) throw error;
+        
+        alert('Modèle mis à jour avec succès!');
+        document.querySelector('.modal-template').remove();
+        loadMessageTemplates();
+        
+    } catch (err) {
+        console.error('Erreur mise à jour modèle:', err);
+        alert('Erreur lors de la mise à jour: ' + err.message);
+    }
+}
+
+async function showTemplateShareDialog(templateId) {
+    try {
+        const { data, error } = await _supabase
+            .from('message_templates')
+            .select('*')
+            .eq('id', templateId)
+            .single();
+        
+        if (error) throw error;
+        
+        // Utiliser la fonction de partage existante
+        shareMessage(templateId, 'Modèle', data.content, data.image_url);
+        
+    } catch (err) {
+        console.error('Erreur partage modèle:', err);
+        alert('Erreur lors du partage du modèle');
     }
 }
 
