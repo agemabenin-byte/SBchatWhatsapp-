@@ -108,6 +108,10 @@
         <button onclick="formatText('color', 'yellow')" style="background:yellow; color:black;" title="Jaune">A</button>
         <button onclick="formatText('color', 'green')" style="background:green; color:white;" title="Vert">A</button>
     </div>
+    <button onclick="formatText('justifyLeft')" title="Gauche">⬅️</button>
+    <button onclick="formatText('justifyCenter')" title="Centre">↔️</button>
+    <button onclick="formatText('justifyRight')" title="Droite">➡️</button>
+    <button onclick="formatText('removeFormat')" title="Effacer format">🗑️</button>
     <button onclick="toggleEmojiPicker()" title="Émoticônes">😊</button>
 </div>
 
@@ -119,7 +123,7 @@
     <label id="admin-attach-btn" for="video-file-input" class="file-label" style="display:none;">📎</label>
     <input type="file" id="video-file-input" accept="video/*,.zip,.exe,.pdf" style="display:none;" onchange="handleAdminFileSelect()">
     
-    <textarea id="msgInput" rows="1" placeholder="Tapez votre message ici..." oninput="autoResize(this)"></textarea>
+<div id="msgInput" contenteditable="true" placeholder="Tapez votre message ici..." oninput="autoResize(this); updateCharCount()"></div>
     <button id="sendBtn" onclick="handleSend()">➤</button>
 </div>
         </div>
@@ -143,12 +147,16 @@
         <button onclick="formatTextBroadcast('color', 'yellow')" style="background:yellow; color:black;" title="Jaune">A</button>
         <button onclick="formatTextBroadcast('color', 'green')" style="background:green; color:white;" title="Vert">A</button>
     </div>
+    <button onclick="formatTextBroadcast('justifyLeft')" title="Gauche">⬅️</button>
+    <button onclick="formatTextBroadcast('justifyCenter')" title="Centre">↔️</button>
+    <button onclick="formatTextBroadcast('justifyRight')" title="Droite">➡️</button>
+    <button onclick="formatTextBroadcast('removeFormat')" title="Effacer format">🗑️</button>
     <button onclick="toggleEmojiPickerBroadcast()" title="Émoticônes">😊</button>
 </div>
 
         <div style="display: flex; gap: 10px; align-items: center; width:90%;">
             <button onclick="toggleFormattingToolbarBroadcast()" class="format-btn" title="Formatage">🎨</button>
-            <textarea id="broadcast-msg" placeholder="Message aux membres..." style="flex:1; height:150px; padding:10px; border-radius:10px;"></textarea>
+    <div id="broadcast-msg" contenteditable="true" placeholder="Message aux membres..." style="flex:1; height:150px; padding:10px; border-radius:10px; overflow-y:auto;"></div>
         </div>
         
         <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 10px;">
@@ -205,12 +213,16 @@
         <button onclick="formatTextInbox('color', 'yellow')" style="background:yellow; color:black;" title="Jaune">A</button>
         <button onclick="formatTextInbox('color', 'green')" style="background:green; color:white;" title="Vert">A</button>
     </div>
+    <button onclick="formatTextInbox('justifyLeft')" title="Gauche">⬅️</button>
+    <button onclick="formatTextInbox('justifyCenter')" title="Centre">↔️</button>
+    <button onclick="formatTextInbox('justifyRight')" title="Droite">➡️</button>
+    <button onclick="formatTextInbox('removeFormat')" title="Effacer format">🗑️</button>
     <button onclick="toggleEmojiPickerInbox()" title="Émoticônes">😊</button>
 </div>
 
     <div style="display: flex; gap: 10px; align-items: center; width:90%;">
         <button onclick="toggleFormattingToolbarInbox()" class="format-btn" title="Formatage">🎨</button>
-        <textarea id="edit-msg" placeholder="Message privé..." style="flex:1; height:100px; padding:10px; border-radius:10px;"></textarea>
+    <div id="edit-msg" contenteditable="true" placeholder="Message privé..." style="flex:1; height:100px; padding:10px; border-radius:10px; overflow-y:auto;"></div>
     </div>
     
     <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 10px;">
