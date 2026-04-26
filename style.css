@@ -72,9 +72,23 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
 }
 .input-area { display:flex; align-items: flex-end; gap: 8px; }
 
-#msgInput { 
+#msgInput, #broadcast-msg, #edit-msg { 
     flex:1; padding:10px; border-radius:15px; border:1px solid #ddd; 
     outline:none; resize: none; max-height: 100px; font-family: inherit;
+    min-height: 20px;
+    line-height: 1.4;
+    overflow-y: auto;
+}
+
+/* Styles pour les contenteditable */
+#msgInput:empty:before, #broadcast-msg:empty:before, #edit-msg:empty:before {
+    content: attr(placeholder);
+    color: #999;
+    font-style: italic;
+}
+
+#msgInput:focus, #broadcast-msg:focus, #edit-msg:focus {
+    border-color: #25D366;
 }
 #sendBtn { 
     background:#25D366; color:white; border:none; 
