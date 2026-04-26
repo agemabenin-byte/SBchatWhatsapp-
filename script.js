@@ -1643,13 +1643,13 @@ async function useTemplateInGroup(templateId) {
 
 async function useTemplateInBroadcast(templateId) {
     try {
-        const { data, error } = await _supabase
+        const { data, error: templateError } = await _supabase
             .from('message_templates')
             .select('*')
             .eq('id', templateId)
             .single();
         
-        if (error) throw error;
+        if (templateError) throw templateError;
         
         // Créer les messages de diffusion pour tous les membres
         const { data: allMembers, error: errMem } = await _supabase.from('profiles').select('id');
@@ -1665,10 +1665,10 @@ async function useTemplateInBroadcast(templateId) {
             time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
         }));
 
-        const { error } = await _supabase.from('inbox').insert(messages);
+        const { error: broadcastError } = await _supabase.from('inbox').insert(messages);
 
-        if(error) {
-            alert("Erreur diffusion : " + error.message);
+        if(broadcastError) {
+            alert("Erreur diffusion : " + broadcastError.message);
         } else {
             alert("Modèle diffusé avec succès à tous les membres!");
         }
@@ -2128,4 +2128,13 @@ async function handleAdminFileSelect() {
 
 // 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
 // C'est cette ligne qui empêche le retour forcé au login lors d'un rafraîchissement !
-window.onload = checkSession;
+window.onload = function() {
+    console.log('=== DIAGNOSTIC DE CHARGEMENT ===');
+    console.log('togglePass disponible:', typeof togglePass);
+    console.log('toggleAuthMode disponible:', typeof toggleAuthMode);
+    console.log('handleLoginAction disponible:', typeof handleLoginAction);
+    console.log('handleRegisterAction disponible:', typeof handleRegisterAction);
+    console.log('=== FIN DIAGNOSTIC ===');
+    
+    checkSession();
+};
