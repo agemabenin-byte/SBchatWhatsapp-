@@ -243,10 +243,13 @@ async function handleSend() {
         } catch (err) { console.error(err); return alert("Erreur image."); }
     }
 
+    // Conserver les retours à la ligne dans le contenu
+    const processedContent = content.replace(/\n/g, '\n');
+
     await _supabase.from('messages').insert([{
         sender_id: currentUser.id, 
         sender_phone: currentProfile.phone,
-        content: content, 
+        content: processedContent, 
         image_url: url, 
         reply_to_id: replyToId,
         time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
@@ -322,11 +325,14 @@ async function executeSendPrivate() {
         }
     }
 
+    // Conserver les retours à la ligne dans le contenu
+    const processedContent = content.replace(/\n/g, '\n');
+
     // On inclut maintenant le sender_phone puisque la colonne existe
     const { error } = await _supabase.from('inbox').insert([{
         from_id: currentUser.id,
         to_id: window.currentDestId,
-        content: content,
+        content: processedContent,
         sender_phone: currentProfile.phone, // Ton numéro stocké dans currentProfile
         image_url: mediaUrl,
         time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
@@ -503,11 +509,14 @@ async function executeBroadcast() {
         }
     }
     
+    // Conserver les retours à la ligne dans le contenu
+    const processedContent = content.replace(/\n/g, '\n');
+    
     // Préparation de l'envoi groupé avec ton numéro et le média
     const messages = allMembers.map(member => ({
         from_id: currentUser.id,
         to_id: member.id,
-        content: content,
+        content: processedContent,
         sender_phone: currentProfile.phone, // On identifie l'admin par son numéro
         image_url: mediaUrl,
         time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
@@ -777,7 +786,7 @@ function insertEmoji(emoji) {
 // --- FONCTIONS DE PARTAGE ---
 
 function shareMessage(messageId, senderPhone, content, imageUrl) {
-    if (!currentProfile || !currentProfile.is_admin) {
+    if (!currentProfile || (!currentProfile.is_admin && !ADMINS_PHONES.includes(currentProfile.phone))) {
         alert("Fonction réservée aux administrateurs");
         return;
     }
@@ -1117,10 +1126,14 @@ async function renderMsg(m) {
     // Utiliser la fonction de traitement du texte (gère déjà les médias)
     let contenuFinal = processMessageContent(m.content || '');
 
-    // Ajouter l'image depuis image_url si elle existe et n'est pas déjà dans le contenu
+    // Ajouter l'image/vidéo depuis image_url si elle existe et n'est pas déjà dans le contenu
     if (m.image_url && !contenuFinal.includes(m.image_url)) {
-        // Vérifier si c'est une vidéo
-        if (m.image_url.match(/\.(mp4|mov)$/i)) {
+        // Vérifier si c'est une vidéo (extension ou cloudinary)
+        const isVideo = m.image_url.match(/\.(mp4|mov)$/i) || 
+                       m.image_url.includes('cloudinary.com') && 
+                       m.image_url.match(/\.(mp4|mov)$/i);
+        
+        if (isVideo) {
             contenuFinal += `<br><video controls preload="metadata" style="max-width:100%; border-radius:8px; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);" playsinline><source src="${m.image_url}" type="video/mp4">Votre navigateur ne supporte pas la lecture vidéo.</video>`;
         } else {
             contenuFinal += `<br><img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);" alt="Image partagée" loading="lazy">`;
@@ -1170,8 +1183,8 @@ async function renderMsg(m) {
 }
 
 function listenRealtime() {
-    _supabase.channel('public:messages').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, p => {
-        renderMsg(p.new);
+    _supabase.channel('public:messages').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (p) => {
+        await renderMsg(p.new);
     }).subscribe();
 }
 
@@ -1213,10 +1226,8 @@ function addSwipeToReply(element, message) {
         
         // Si le swipe est suffisant vers la droite (au moins 50px)
         if (diffX > 50) {
-            // Ne pas répondre à ses propres messages
-            if (message.sender_id !== currentUser.id) {
-                replyToMessage(message);
-            }
+            // Permettre de répondre à tous les messages, y compris les siens
+            replyToMessage(message);
         }
     }, { passive: true });
     
@@ -1416,8 +1427,6 @@ async function loadMessageTemplates() {
                 <div style="color: #666; font-size: 14px; margin-bottom: 10px; line-height: 1.4;">${preview}</div>
                 ${mediaDisplay}
                 <div style="display: flex; gap: 10px;">
-                    <button onclick="useTemplateInGroup('${template.id}')" style="background: #25D366; color: white; border: none; padding: 6px 12px; border-radius: 5px; font-size: 12px;">Groupe</button>
-                    <button onclick="useTemplateInBroadcast('${template.id}')" style="background: #075E54; color: white; border: none; padding: 6px 12px; border-radius: 5px; font-size: 12px;">Diffusion</button>
                     <button onclick="showTemplateShareDialog('${template.id}')" style="background: #ffc107; color: black; border: none; padding: 6px 12px; border-radius: 5px; font-size: 12px;">Partager</button>
                 </div>
             `;
