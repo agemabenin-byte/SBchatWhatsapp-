@@ -1,33 +1,269 @@
-// Fonction pour uploader sur le compte VIDEO (dn3vf0mhm)
-async function uploadToVideoCloud(file) {
-    const cloudName = "dn3vf0mhm";
-    const uploadPreset = "video_preset";
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SuccesBonheur WhatsApp Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<div id="upload-progress-container" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center; flex-direction:column; color:white;">
+    <h3>Envoi du fichier en cours...</h3>
+    <div style="width:80%; height:20px; background:#ccc; border-radius:10px; overflow:hidden;">
+        <div id="upload-progress-bar" style="width:0%; height:100%; background:#25D366; transition:width 0.3s;"></div>
+    </div>
+    <p id="upload-progress-text">0%</p>
+</div>
     
-    // On détermine si c'est une vidéo ou un fichier brut (ZIP/EXE)
-    const isVideo = file.type.startsWith('video/');
-    const resourceType = isVideo ? "video" : "raw";
+<div id="page-login" class="page">
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', uploadPreset);
+    <div class="auth-container">
+        <span style="color: #25D366; font-weight: bold;">Bienvenue sur la messagerie instantanée de</span>
+        <h2 style="color: #25D366; font-weight: bold;">SuccesBonheur.Online</h2>
+        <img src="https://res.cloudinary.com/dtkssnhub/image/upload/q_auto/f_auto/v1776275286/Logo_SB_TRANSPARENT_es33z1.png" alt="Logo SuccesBonheur" class="auth-logo"> 
+    </div>
 
-    try {
-        const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
-            method: 'POST',
-            body: formData
-        });
+    
+    <h2 id="auth-title">Connexion</h2>
+    
+    <div id="login-fields" style="width: 100%;">
+        <input type="email" id="auth-email" placeholder="Email">
+          <div class="password-container">
+        <input type="password" id="auth-password" placeholder="Mot de passe">
+        <span class="toggle-password" onclick="togglePass('auth-password', this)">👁️</span>
+          </div>
+        <p style="text-align: right; width: 85%; max-width: 350px; margin: 0 auto 10px auto;">
+        <a href="#" onclick="handleForgotPassword()" style="color: gray; font-size: 12px; text-decoration: none;">Mot de passe oublié ?</a>
+        </p>
+        <button onclick="handleLoginAction()" style="background: #25D366;">Se Connecter</button>
+        <p style="font-size: 14px; margin-top: 15px;">
+            Pas encore de compte ? <a href="#" onclick="toggleAuthMode(true)" style="color: #075E54; font-weight: bold;">S'inscrire</a>
+        </p>
+    </div>
+
+    <div id="register-fields" style="display: none; width: 100%;">
+        <input type="text" id="auth-phone" placeholder="Numéro (ex: 00229...)">
+        <input type="email" id="reg-email" placeholder="Email">
+           <div class="password-container">   
+        <input type="password" id="reg-password" placeholder="Mot de passe">
+        <span class="toggle-password" onclick="togglePass('reg-password', this)">👁️</span>
+           </div>
+        <button onclick="handleRegisterAction()" style="background: #075E54;">S'inscrire</button>
+        <p style="font-size: 14px; margin-top: 15px;">
+            Déjà un compte ? <a href="#" onclick="toggleAuthMode(false)" style="color: #25D366; font-weight: bold;">Se connecter</a>
+        </p>
+    </div>
+</div>
+
+    <div id="page-chat" class="page" style="display:none;">
+        <div id="groupChoice" style="padding:10px; background:#fff; text-align:center;">
+            <b id="welcomeText">Salut ...</b>
+        </div>
+
+        <div class="header">
+            <div id="inboxBtn" onclick="showView('page-inbox')">
+                ✉️<span id="inboxCount">0</span>
+            </div>
+            
+            <div style="display:flex; align-items:center; flex:1; justify-content:center;">
+                <b id="groupTitle">Forum SuccesBonheur</b>
+            </div>
+            
+            <div style="display:flex; align-items:center; gap:20px;">
+                <input type="text" id="chat-search" placeholder="🔍..." style="padding:5px 10px; border-radius:15px; border:1px solid white; background:rgba(255,255,255,0.9); color:#075E54; outline:none; width:58px; margin-right:auto;" oninput="filterChatMessages()">
+                <div id="adminMenuBtn" onclick="toggleMenu()" style="color:black; font-size:24px; font-weight:bold; background:rgba(255,255,255,0.8); padding:5px 8px; border-radius:25%; flex-shrink:0;">⋮</div>
+            </div>
+            <div id="adminDropdown" class="dropdown-content">
+                <button onclick="showView('page-members')">👥 Liste des membres</button>
+                <button onclick="showView('page-broadcast')">📢 Diffusion à tous</button>
+                <button onclick="showMessageTemplates()" id="templates-btn" style="display:none;">📋 Modèles Messages - Catalogues</button>
+                <button onclick="exporterContacts()">📥 Exporter EXCEL (XLS)</button>
+                <button onclick="handleLogout()" style="color:red;">🚪 Déconnexion</button>
+            </div>
+        </div>
         
-        const data = await response.json();
+        <div class="messages" id="chat-box"></div>
+
+        <div id="reply-preview">
+            <div style="display:flex; flex-direction:column;">
+                <small id="reply-user" style="font-weight:bold; color:#075E54;"></small>
+                <span id="reply-text"></span>
+            </div>
+            <button onclick="cancelReply()" style="background:none; border:none; font-size:18px;">✕</button>
+        </div>
         
-        if (data.secure_url) {
-            return data.secure_url;
-        } else {
-            console.error("Erreur Cloudinary:", data.error.message);
-            alert("Erreur : " + data.error.message);
-            return null;
-        }
-    } catch (err) {
-        console.error("Erreur réseau:", err);
-        return null;
-    }
-}
+        <div class="input-area-container">
+<!-- Barre d'outils simplifiée - uniquement boutons médias -->
+<div class="input-area">
+    <label for="file-input" class="file-label">📷</label>
+    <input type="file" id="file-input" accept="image/*" style="display:none;" onchange="handleFileSelect()">
+    
+    <label id="admin-attach-btn" for="video-file-input" class="file-label" style="display:none;">📎</label>
+    <input type="file" id="video-file-input" accept="video/*,.zip,.exe,.pdf" style="display:none;" onchange="handleAdminFileSelect()">
+    
+<div id="msgInput" contenteditable="true" placeholder="Tapez votre message ici..." oninput="autoResize(this); updateCharCount()"></div>
+    <button id="sendBtn" onclick="handleSend()">➤</button>
+</div>
+        </div>
+    </div>
+
+<div id="page-broadcast" class="page" style="display:none;">
+    <div class="header">
+        <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
+        <b>Diffusion à tous</b>
+    </div>
+    <div class="editor-container">
+<!-- Barre d'outils simplifiée pour diffusion -->
+        <div style="display: flex; gap: 10px; align-items: center; width:90%;">
+            <label for="bc-photo-input" style="cursor:pointer; font-size:24px;">📷</label>
+            <input type="file" id="bc-photo-input" accept="image/*" style="display:none;" onchange="handleBroadcastMedia('image')">
+            
+            <label id="admin-bc-attach" for="bc-video-input" style="display:none; cursor:pointer; font-size:24px;">📎</label>
+            <input type="file" id="bc-video-input" accept="video/*,.zip,.exe,.pdf" style="display:none;" onchange="handleBroadcastMedia('video')">
+            
+    <div id="broadcast-msg" contenteditable="true" placeholder="Message aux membres..." style="flex:1; height:150px; padding:10px; border-radius:10px; overflow-y:auto;"></div>
+        </div>
+        
+        <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 10px;">
+        </div>
+
+        <button onclick="executeBroadcast()" style="width:90%;">ENVOYER À TOUS</button>
+    </div>
+</div>
+
+    <div id="page-members" class="page" style="display:none;">
+        <div class="header">
+            <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
+            <div style="flex:1; display:flex; justify-content:center; align-items:center; padding:0 60px;">
+                <b>Membres (<span id="total-members-count">0</span>)</b>
+            </div>
+            <input type="text" id="members-search" placeholder="🔍..." style="padding:5px 10px; border-radius:15px; border:1px solid white; background:rgba(255,255,255,0.9); color:#075E54; outline:none; width:64px; position:absolute; right:20px;" oninput="filterMembers()">
+        </div>
+        <div id="members-list" class="messages"></div>
+    </div>
+
+    <div id="page-inbox" class="page" style="display:none;">
+        <div class="header">
+            <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
+            <div style="flex:1; display:flex; justify-content:center; align-items:center; padding:0 70px;">
+                <b>Méssages Privés</b>
+            </div>
+            <input type="text" id="inbox-search" placeholder="🔍..." style="padding:5px 10px; border-radius:15px; border:1px solid white; background:rgba(255,255,255,0.9); color:#075E54; outline:none; width:64px; position:absolute; right:20px;" oninput="filterInbox()">
+        </div>
+        <div id="inbox-list" class="messages"></div>
+    </div>
+
+    <div id="page-editor" class="page" style="display:none;">
+        <div class="header">
+            <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
+            <b>Inbox</b>
+        </div>
+<div class="editor-container">
+    <p>Envoyer à : <b id="dest-display"></b></p>
+    
+<!-- Barre d'outils simplifiée pour inbox -->
+    <div style="display: flex; gap: 10px; align-items: center; width:90%;">
+        <label for="inbox-photo-input" style="cursor:pointer; font-size:24px;">📷</label>
+        <input type="file" id="inbox-photo-input" accept="image/*" style="display:none;" onchange="handleInboxMedia('image')">
+        
+        <label id="admin-inbox-attach" for="inbox-video-input" style="display:none; cursor:pointer; font-size:24px;">📎</label>
+        <input type="file" id="inbox-video-input" accept="video/*,.zip,.exe,.pdf" style="display:none;" onchange="handleInboxMedia('video')">
+        
+    <div id="edit-msg" contenteditable="true" placeholder="Message privé..." style="flex:1; height:100px; padding:10px; border-radius:10px; overflow-y:auto;"></div>
+    </div>
+    
+    <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 10px;">
+    </div>
+    
+    <button onclick="executeSendPrivate()" style="width:90%;">ENVOYER</button>
+</div>
+    </div>
+
+    <div id="page-templates" class="page" style="display:none;">
+        <div class="header">
+            <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
+            <div style="flex:1; display:flex; justify-content:center; align-items:center; padding:0 60px;">
+                <b>Modèles Messages</b>
+            </div>
+            <button onclick="toggleCreateTemplate()" style="background:white; color:#25D366; border:none; padding:5px 10px; border-radius:5px; font-size:12px; position:absolute; right:20px;">+ Créer</button>
+        </div>
+        
+        <div id="templates-list" class="messages" style="padding:10px;">
+            <div style="text-align:center; padding:20px;">⏳ Chargement des modèles...</div>
+        </div>
+    </div>
+
+    <!-- Sélecteur d'émoticônes -->
+<div id="emoji-picker" class="emoji-picker">
+    <div class="emoji-category">Informatique</div>
+    <div class="emoji-grid">
+        <button class="emoji-btn" onclick="insertEmoji('💻')">💻</button>
+        <button class="emoji-btn" onclick="insertEmoji('🖥️')">🖥️</button>
+        <button class="emoji-btn" onclick="insertEmoji('⌨️')">⌨️</button>
+        <button class="emoji-btn" onclick="insertEmoji('🖱️')">🖱️</button>
+        <button class="emoji-btn" onclick="insertEmoji('📱')">📱</button>
+        <button class="emoji-btn" onclick="insertEmoji('💾')">💾</button>
+        <button class="emoji-btn" onclick="insertEmoji('💿')">💿</button>
+        <button class="emoji-btn" onclick="insertEmoji('📀')">📀</button>
+        <button class="emoji-btn" onclick="insertEmoji('🖨️')">🖨️</button>
+        <button class="emoji-btn" onclick="insertEmoji('📠')">📠</button>
+        <button class="emoji-btn" onclick="insertEmoji('📡')">📡</button>
+        <button class="emoji-btn" onclick="insertEmoji('📞')">📞</button>
+    </div>
+    
+    <div class="emoji-category">Cœurs</div>
+    <div class="emoji-grid">
+        <button class="emoji-btn" onclick="insertEmoji('❤️')">❤️</button>
+        <button class="emoji-btn" onclick="insertEmoji('💚')">💚</button>
+        <button class="emoji-btn" onclick="insertEmoji('💛')">💛</button>
+        <button class="emoji-btn" onclick="insertEmoji('💗')">💗</button>
+        <button class="emoji-btn" onclick="insertEmoji('💓')">💓</button>
+        <button class="emoji-btn" onclick="insertEmoji('💕')">💕</button>
+        <button class="emoji-btn" onclick="insertEmoji('💖')">💖</button>
+        <button class="emoji-btn" onclick="insertEmoji('💘')">💘</button>
+        <button class="emoji-btn" onclick="insertEmoji('💝')">💝</button>
+        <button class="emoji-btn" onclick="insertEmoji('💞')">💞</button>
+        <button class="emoji-btn" onclick="insertEmoji('💟')">💟</button>
+        <button class="emoji-btn" onclick="insertEmoji('💌')">💌</button>
+    </div>
+    
+    <div class="emoji-category">Bureautique</div>
+    <div class="emoji-grid">
+        <button class="emoji-btn" onclick="insertEmoji('📌')">📌</button>
+        <button class="emoji-btn" onclick="insertEmoji('📍')">📍</button>
+        <button class="emoji-btn" onclick="insertEmoji('📎')">📎</button>
+        <button class="emoji-btn" onclick="insertEmoji('🖇️')">🖇️</button>
+        <button class="emoji-btn" onclick="insertEmoji('📏')">📏</button>
+        <button class="emoji-btn" onclick="insertEmoji('📐')">📐</button>
+        <button class="emoji-btn" onclick="insertEmoji('✂️')">✂️</button>
+        <button class="emoji-btn" onclick="insertEmoji('📝')">📝</button>
+        <button class="emoji-btn" onclick="insertEmoji('📄')">📄</button>
+        <button class="emoji-btn" onclick="insertEmoji('📃')">📃</button>
+        <button class="emoji-btn" onclick="insertEmoji('📋')">📋</button>
+        <button class="emoji-btn" onclick="insertEmoji('📁')">📁</button>
+    </div>
+    
+    <div class="emoji-category">Divers</div>
+    <div class="emoji-grid">
+        <button class="emoji-btn" onclick="insertEmoji('🌍')">🌍</button>
+        <button class="emoji-btn" onclick="insertEmoji('🌐')">🌐</button>
+        <button class="emoji-btn" onclick="insertEmoji('⭐')">⭐</button>
+        <button class="emoji-btn" onclick="insertEmoji('✨')">✨</button>
+        <button class="emoji-btn" onclick="insertEmoji('🔥')">🔥</button>
+        <button class="emoji-btn" onclick="insertEmoji('✅')">✅</button>
+        <button class="emoji-btn" onclick="insertEmoji('❌')">❌</button>
+        <button class="emoji-btn" onclick="insertEmoji('⚠️')">⚠️</button>
+        <button class="emoji-btn" onclick="insertEmoji('🚀')">🚀</button>
+        <button class="emoji-btn" onclick="insertEmoji('💡')">💡</button>
+        <button class="emoji-btn" onclick="insertEmoji('🎯')">🎯</button>
+        <button class="emoji-btn" onclick="insertEmoji('🏆')">🏆</button>
+    </div>
+</div>
+
+    <script src="cloudinary-videos-fichiers.js"></script>
+    <script src="script.js" defer></script>
+</body>
+</html>
