@@ -224,9 +224,13 @@ async function handleSend() {
     const file = fileInput.files[0];
     let url = null;
 
-    if(!content && !file) return;
+    if(!content && !file && !window.templateMediaUrl) return;
 
-    if(file) {
+    // Utiliser le média du modèle si disponible, sinon uploader le fichier
+    if(window.templateMediaUrl && !file) {
+        url = window.templateMediaUrl;
+        window.templateMediaUrl = null; // Réinitialiser après utilisation
+    } else if(file) {
         try {
             const formData = new FormData();
             formData.append('file', file);
@@ -292,12 +296,39 @@ async function executeSendPrivate() {
     const content = getEditorContent('edit-msg');
     if(!content || !window.currentDestId) return alert("Message vide !");
 
+    // Vérifier s'il y a un média de modèle ou un fichier uploadé
+    let mediaUrl = window.templateMediaUrl || null;
+    const fileInput = document.getElementById('inbox-photo-input');
+    const videoInput = document.getElementById('inbox-video-input');
+    const file = fileInput.files[0] || videoInput.files[0];
+    
+    if(!mediaUrl && file) {
+        try {
+            if(file.type.startsWith('video/')) {
+                mediaUrl = await uploadToVideoCloud(file);
+            } else {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', "chat_preset");
+                const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
+                    method: 'POST', body: formData
+                });
+                const data = await response.json();
+                if(data.secure_url) mediaUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+            }
+        } catch (err) { 
+            console.error(err); 
+            return alert("Erreur fichier."); 
+        }
+    }
+
     // On inclut maintenant le sender_phone puisque la colonne existe
     const { error } = await _supabase.from('inbox').insert([{
         from_id: currentUser.id,
         to_id: window.currentDestId,
         content: content,
         sender_phone: currentProfile.phone, // Ton numéro stocké dans currentProfile
+        image_url: mediaUrl,
         time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
     }]);
 
@@ -306,9 +337,10 @@ async function executeSendPrivate() {
     } else {
         alert("Message privé envoyé !");
         // NETTOYAGE
-    clearEditor('edit-msg'); // Vide le texte
-    document.getElementById('inbox-photo-input').value = ""; // Vide l'image sélectionnée
-    document.getElementById('inbox-video-input').value = ""; // Vide le fichier sélectionné
+        clearEditor('edit-msg'); // Vide le texte
+        document.getElementById('inbox-photo-input').value = ""; // Vide l'image sélectionnée
+        document.getElementById('inbox-video-input').value = ""; // Vide le fichier sélectionné
+        window.templateMediaUrl = null; // Réinitialiser le média du modèle
         goBack();
     }
 }
@@ -378,27 +410,18 @@ async function loadInbox() {
             const div = document.createElement('div');
             div.style = "background:white; margin:10px; padding:10px; border-radius:8px; border-left:5px solid #25D366; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
             
-            // Utiliser la nouvelle fonction de traitement du texte
+            // Traiter le contenu avec les médias
             let messageAffiche = processMessageContent(msg.content || "");
 
-            // --- DÉTECTION INTELLIGENTE DES MÉDIAS ---
-            
-            // 1. Détection des Images Cloudinary
-            if (msg.image_url) {
-                messageAffiche += `<br><img src="${msg.image_url}" style="max-width:100%; border-radius:8px; display:block; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">`;
+            // Ajouter l'image depuis image_url si elle existe
+            if (msg.image_url && !messageAffiche.includes(msg.image_url)) {
+                // Vérifier si c'est une vidéo
+                if (msg.image_url.match(/\.(mp4|mov)$/i)) {
+                    messageAffiche += `<br><video controls preload="metadata" style="max-width:100%; border-radius:8px; display:block; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);"><source src="${msg.image_url}" type="video/mp4"></video>`;
+                } else {
+                    messageAffiche += `<br><img src="${msg.image_url}" style="max-width:100%; border-radius:8px; display:block; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);" alt="Image partagée">`;
+                }
             }
-            
-            // 2. Détection des URLs d'images dans le contenu
-            messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)[^\s]*)/g, 
-                '<img src="$1" style="max-width:100%; border-radius:8px; display:block; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">');
-            
-            // 3. Détection des Vidéos
-            messageAffiche = messageAffiche.replace(/(https?:\/\/[^\s]+\.(mp4|mov)[^\s]*)/g, 
-                '<video controls style="max-width:100%; border-radius:8px; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);"><source src="$1" type="video/mp4"></video>');
-            
-            // 4. Détection des autres fichiers joints
-            messageAffiche = messageAffiche.replace(/(https?:\/\/res\.cloudinary\.com\/[^\s]+)/g, 
-                '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:8px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier joint</a>');
 
             // Vérifier si on doit afficher la poubelle et le partage
             const senderIsAdmin = msg.profiles?.is_admin || ADMINS_PHONES.includes(msg.sender_phone);
@@ -454,12 +477,39 @@ async function executeBroadcast() {
     const { data: allMembers, error: errMem } = await _supabase.from('profiles').select('id');
     if(errMem) return alert("Erreur membres: " + errMem.message);
     
-    // Préparation de l'envoi groupé avec ton numéro
+    // Vérifier s'il y a un média de modèle ou un fichier uploadé
+    let mediaUrl = window.templateMediaUrl || null;
+    const fileInput = document.getElementById('bc-photo-input');
+    const videoInput = document.getElementById('bc-video-input');
+    const file = fileInput.files[0] || videoInput.files[0];
+    
+    if(!mediaUrl && file) {
+        try {
+            if(file.type.startsWith('video/')) {
+                mediaUrl = await uploadToVideoCloud(file);
+            } else {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', "chat_preset");
+                const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
+                    method: 'POST', body: formData
+                });
+                const data = await response.json();
+                if(data.secure_url) mediaUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+            }
+        } catch (err) { 
+            console.error(err); 
+            return alert("Erreur fichier."); 
+        }
+    }
+    
+    // Préparation de l'envoi groupé avec ton numéro et le média
     const messages = allMembers.map(member => ({
         from_id: currentUser.id,
         to_id: member.id,
         content: content,
         sender_phone: currentProfile.phone, // On identifie l'admin par son numéro
+        image_url: mediaUrl,
         time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
     }));
 
@@ -470,6 +520,9 @@ async function executeBroadcast() {
     } else {
         alert("Message diffusé avec succès !");
         clearEditor('broadcast-msg');
+        document.getElementById('bc-photo-input').value = "";
+        document.getElementById('bc-video-input').value = "";
+        window.templateMediaUrl = null; // Réinitialiser le média du modèle
         goBack();
     }
 }
@@ -657,71 +710,16 @@ function cancelReply() {
 }
 async function handleLogout() { await _supabase.auth.signOut(); location.reload(); }
 
-// --- FONCTIONS DE FORMATAGE WYSIWYG ---
+// --- FONCTIONS D'ÉDITEUR SIMPLIFIÉES ---
 
-// Fonction pour appliquer le formatage directement dans le contenteditable
-function applyFormatting(targetId, command, value = null) {
-    const editor = document.getElementById(targetId);
-    if (!editor) return;
-    
-    editor.focus();
-    
-    try {
-        switch(command) {
-            case 'bold':
-                document.execCommand('bold', false, null);
-                break;
-            case 'italic':
-                document.execCommand('italic', false, null);
-                break;
-            case 'underline':
-                document.execCommand('underline', false, null);
-                break;
-            case 'color':
-                document.execCommand('foreColor', false, value);
-                break;
-            case 'justifyLeft':
-                document.execCommand('justifyLeft', false, null);
-                break;
-            case 'justifyCenter':
-                document.execCommand('justifyCenter', false, null);
-                break;
-            case 'justifyRight':
-                document.execCommand('justifyRight', false, null);
-                break;
-            case 'removeFormat':
-                document.execCommand('removeFormat', false, null);
-                break;
-        }
-    } catch (e) {
-        console.error('Erreur de formatage:', e);
-    }
-    
-    // Garder le focus
-    editor.focus();
-}
-
-// Fonction pour obtenir le contenu HTML de l'éditeur
+// Fonction pour obtenir le contenu texte de l'éditeur
 function getEditorContent(targetId) {
     const editor = document.getElementById(targetId);
     if (!editor) return '';
     
-    // Obtenir le contenu HTML et le convertir en format de stockage
-    let html = editor.innerHTML;
-    
-    // Remplacer les balises HTML par notre format de stockage
-    html = html.replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**');
-    html = html.replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*');
-    html = html.replace(/<u[^>]*>(.*?)<\/u>/gi, '__$1__');
-    html = html.replace(/<span[^>]*style="color:[^"]*"[^>]*>(.*?)<\/span>/gi, '$1'); // Garder le texte sans couleur pour le stockage
-    html = html.replace(/<br[^>]*>/gi, '\n');
-    html = html.replace(/<div[^>]*>/gi, '\n').replace(/<\/div>/gi, '');
-    html = html.replace(/<p[^>]*>/gi, '').replace(/<\/p>/gi, '\n');
-    
-    // Nettoyer les HTML restants
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = html;
-    return tempDiv.textContent || tempDiv.innerText || '';
+    // Obtenir le contenu texte brut
+    let text = editor.textContent || editor.innerText || '';
+    return text.trim();
 }
 
 // Fonction pour définir le contenu de l'éditeur
@@ -729,15 +727,8 @@ function setEditorContent(targetId, content) {
     const editor = document.getElementById(targetId);
     if (!editor) return;
     
-    // Convertir notre format de stockage en HTML
-    let html = content || '';
-    
-    // Remplacer notre format par HTML
-    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    html = html.replace(/__(.*?)__/g, '<u>$1</u>');
-    html = html.replace(/\n/g, '<br>');
-    
+    // Convertir les retours à la ligne en <br> pour le contenteditable
+    let html = (content || '').replace(/\n/g, '<br>');
     editor.innerHTML = html;
 }
 
@@ -746,36 +737,6 @@ function clearEditor(targetId) {
     const editor = document.getElementById(targetId);
     if (!editor) return;
     editor.innerHTML = '';
-}
-
-// Pour le groupe
-function toggleFormattingToolbar() {
-    const toolbar = document.getElementById('formatting-toolbar');
-    toolbar.style.display = toolbar.style.display === 'none' ? 'flex' : 'none';
-}
-
-function formatText(command, value = null) {
-    applyFormatting('msgInput', command, value);
-}
-
-// Pour la diffusion
-function toggleFormattingToolbarBroadcast() {
-    const toolbar = document.getElementById('broadcast-formatting-toolbar');
-    toolbar.style.display = toolbar.style.display === 'none' ? 'flex' : 'none';
-}
-
-function formatTextBroadcast(command, value = null) {
-    applyFormatting('broadcast-msg', command, value);
-}
-
-// Pour l'inbox
-function toggleFormattingToolbarInbox() {
-    const toolbar = document.getElementById('inbox-formatting-toolbar');
-    toolbar.style.display = toolbar.style.display === 'none' ? 'flex' : 'none';
-}
-
-function formatTextInbox(command, value = null) {
-    applyFormatting('edit-msg', command, value);
 }
 
 // --- FONCTIONS D'ÉMOTICÔNES ---
@@ -1083,7 +1044,7 @@ function processMessageContent(content) {
     // 1. Remplacer les retours à la ligne par <br>
     let processed = content.replace(/\n/g, '<br>');
     
-    // 2. Gérer le formatage markdown
+    // 2. Gérer le formatage markdown (conservé pour compatibilité)
     // Gras : **texte** -> <b>texte</b>
     processed = processed.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
     
@@ -1099,15 +1060,26 @@ function processMessageContent(content) {
     // 4. Détecter et traiter les médias AVANT les URLs régulières
     // Images
     processed = processed.replace(/(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)[^\s]*)/g, 
-        '<img src="$1" style="max-width:100%; border-radius:8px; display:block; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">');
+        '<img src="$1" style="max-width:100%; border-radius:8px; display:block; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);" alt="Image partagée" loading="lazy">');
     
-    // Vidéos (sans autoplay)
+    // Vidéos (sans autoplay, avec contrôles et preload)
     processed = processed.replace(/(https?:\/\/[^\s]+\.(mp4|mov)[^\s]*)/g, 
-        '<video controls preload="metadata" style="max-width:100%; border-radius:8px; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);"><source src="$1" type="video/mp4"></video>');
+        '<video controls preload="metadata" style="max-width:100%; border-radius:8px; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);" playsinline><source src="$1" type="video/mp4">Votre navigateur ne supporte pas la lecture vidéo.</video>');
     
-    // Fichiers Cloudinary
-    processed = processed.replace(/(https?:\/\/res\.cloudinary\.com\/[^\s]+)/g, 
-        '<a href="$1" target="_blank" style="display:inline-block; background:#f0f0f0; padding:8px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier joint</a>');
+    // Fichiers Cloudinary (vidéos et autres)
+    processed = processed.replace(/(https?:\/\/res\.cloudinary\.com\/[^\s]*\.(mp4|mov)[^\s]*)/g, 
+        '<video controls preload="metadata" style="max-width:100%; border-radius:8px; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);" playsinline><source src="$1" type="video/mp4">Votre navigateur ne supporte pas la lecture vidéo.</video>');
+    
+    // Autres fichiers Cloudinary (images, documents)
+    processed = processed.replace(/(https?:\/\/res\.cloudinary\.com\/[^\s]*(?!\.(mp4|mov)$)[^\s]*)/g, 
+        function(match) {
+            // Vérifier si c'est une image
+            if (match.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+                return `<img src="${match}" style="max-width:100%; border-radius:8px; display:block; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);" alt="Image Cloudinary" loading="lazy">`;
+            } else {
+                return `<a href="${match}" target="_blank" style="display:inline-block; background:#f0f0f0; padding:8px; border-radius:5px; text-decoration:none; color:#075E54; font-weight:bold; margin-top:5px;">📥 Télécharger le fichier joint</a>`;
+            }
+        });
     
     // 5. Rendre les URLs cliquables (seulement celles qui ne sont pas des médias)
     const urlRegex = /(https?:\/\/[^\s<]+)/g;
@@ -1142,33 +1114,24 @@ async function renderMsg(m) {
     div.dataset.content = m.content || '';
     div.dataset.imageUrl = m.image_url || '';
 
-    // Utiliser la nouvelle fonction de traitement du texte
+    // Utiliser la fonction de traitement du texte (gère déjà les médias)
     let contenuFinal = processMessageContent(m.content || '');
 
-    // Détection Vidéo dans le texte
-    if (contenuFinal.includes('.mp4') || contenuFinal.includes('.mov')) {
-        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.mp4|\.mov)[^\s]*)/g, 
-            `<video controls style="max-width:100%; border-radius:8px; margin-top:5px;">
-                <source src="$1" type="video/mp4">
-             </video>`);
-    } 
-    // Détection Image dans le texte (si pas déjà géré par m.image_url)
-    else if (contenuFinal.match(/\.(jpeg|jpg|gif|png|webp)/i)) {
-        contenuFinal = contenuFinal.replace(/(https?:\/\/[^\s]+(?:\.jpg|\.png|\.jpeg|\.webp)[^\s]*)/g, 
-            `<img src="$1" style="max-width:100%; border-radius:8px; margin-top:5px;">`);
-    }
-
-    // Gestion de la colonne image_url (ton système actuel pour les photos simples)
-    let mediaSupplementaire = "";
+    // Ajouter l'image depuis image_url si elle existe et n'est pas déjà dans le contenu
     if (m.image_url && !contenuFinal.includes(m.image_url)) {
-         mediaSupplementaire = `<img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px;">`;
+        // Vérifier si c'est une vidéo
+        if (m.image_url.match(/\.(mp4|mov)$/i)) {
+            contenuFinal += `<br><video controls preload="metadata" style="max-width:100%; border-radius:8px; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);" playsinline><source src="${m.image_url}" type="video/mp4">Votre navigateur ne supporte pas la lecture vidéo.</video>`;
+        } else {
+            contenuFinal += `<br><img src="${m.image_url}" class="chat-img" style="max-width:100%; border-radius:8px; margin-top:5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);" alt="Image partagée" loading="lazy">`;
+        }
     }
 
     // Icônes pour les admins
     const currentUserIsAdmin = currentProfile && currentProfile.is_admin;
     const deleteIcon = currentUserIsAdmin ? `<span onclick="supprimerMessageGroupe('${m.id}', '${m.image_url || ''}', '${m.media_public_id || ''}')" style="cursor:pointer; color:red; margin-left:8px; font-size:12px;">🗑️</span>` : "";
     const contentEncoded = encodeURIComponent(m.content || '');
-const shareIcon = currentUserIsAdmin ? `<span onclick="shareMessage('${m.id}', '${m.sender_phone}', '${contentEncoded}', '${m.image_url || ''}')" style="cursor:pointer; color:blue; margin-left:8px; font-size:12px;">⤴️</span>` : "";
+    const shareIcon = currentUserIsAdmin ? `<span onclick="shareMessage('${m.id}', '${m.sender_phone}', '${contentEncoded}', '${m.image_url || ''}')" style="cursor:pointer; color:blue; margin-left:8px; font-size:12px;">⤴️</span>` : "";
 
     // Ajouter l'aperçu de réponse si c'est une réponse
     let replyPreview = "";
@@ -1196,7 +1159,6 @@ const shareIcon = currentUserIsAdmin ? `<span onclick="shareMessage('${m.id}', '
 
     div.innerHTML = `<small><b>${m.sender_phone}</b>${deleteIcon}${shareIcon}</small>
                      ${replyPreview}
-                     ${mediaSupplementaire}
                      <div style="word-wrap: break-word;">${contenuFinal}</div>
                      <small style="font-size:10px; display:block; text-align:right; pointer-events: none; cursor: default;">${m.time}</small>`;
     
@@ -1626,8 +1588,11 @@ async function useTemplateInGroup(templateId) {
         
         if (error) throw error;
         
-        // Remplir le champ de saisie du groupe avec le nouveau système WYSIWYG
+        // Remplir le champ de saisie du groupe avec le contenu
         setEditorContent('msgInput', data.content);
+        
+        // Stocker l'URL du média pour l'utiliser lors de l'envoi
+        window.templateMediaUrl = data.image_url;
         
         // Retourner au groupe
         goBack();
@@ -1651,31 +1616,53 @@ async function useTemplateInBroadcast(templateId) {
         
         if (templateError) throw templateError;
         
-        // Créer les messages de diffusion pour tous les membres
-        const { data: allMembers, error: errMem } = await _supabase.from('profiles').select('id');
-        if(errMem) return alert("Erreur membres: " + errMem.message);
+        // Remplir le champ de diffusion avec le contenu
+        setEditorContent('broadcast-msg', data.content);
         
-        // Préparation de l'envoi groupé
-        const messages = allMembers.map(member => ({
-            from_id: currentUser.id,
-            to_id: member.id,
-            content: data.content,
-            sender_phone: currentProfile.phone,
-            image_url: data.image_url,
-            time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
-        }));
-
-        const { error: broadcastError } = await _supabase.from('inbox').insert(messages);
-
-        if(broadcastError) {
-            alert("Erreur diffusion : " + broadcastError.message);
-        } else {
-            alert("Modèle diffusé avec succès à tous les membres!");
-        }
+        // Stocker l'URL du média pour l'utiliser lors de l'envoi
+        window.templateMediaUrl = data.image_url;
+        
+        // Retourner à la page de diffusion
+        goBack();
+        
+        // Focus sur le champ de saisie
+        document.getElementById('broadcast-msg').focus();
         
     } catch (err) {
-        console.error('Erreur diffusion modèle:', err);
-        alert('Erreur lors de la diffusion du modèle');
+        console.error('Erreur utilisation modèle diffusion:', err);
+        alert('Erreur lors du chargement du modèle');
+    }
+}
+
+async function useTemplateInInbox(templateId, destId, destPhone) {
+    try {
+        const { data, error: templateError } = await _supabase
+            .from('message_templates')
+            .select('*')
+            .eq('id', templateId)
+            .single();
+        
+        if (templateError) throw templateError;
+        
+        // Remplir le champ de message privé avec le contenu
+        setEditorContent('edit-msg', data.content);
+        
+        // Stocker l'URL du média pour l'utiliser lors de l'envoi
+        window.templateMediaUrl = data.image_url;
+        
+        // Configurer la destination
+        document.getElementById('dest-display').innerText = destPhone;
+        window.currentDestId = destId;
+        
+        // Retourner à la page d'édition
+        goBack();
+        
+        // Focus sur le champ de saisie
+        document.getElementById('edit-msg').focus();
+        
+    } catch (err) {
+        console.error('Erreur utilisation modèle inbox:', err);
+        alert('Erreur lors du chargement du modèle');
     }
 }
 
@@ -1783,12 +1770,206 @@ async function showTemplateShareDialog(templateId) {
         
         if (error) throw error;
         
-        // Utiliser la fonction de partage existante
-        shareMessage(templateId, 'Modèle', data.content, data.image_url);
+        // Créer une fenêtre de partage spécifique pour les modèles
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+        
+        const dialog = document.createElement('div');
+        dialog.style.cssText = `
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 90%;
+            max-height: 80%;
+            overflow-y: auto;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        `;
+        
+        // Préparer le contenu avec média
+        let mediaPreview = '';
+        if (data.image_url) {
+            if (data.image_url.match(/\.(mp4|mov)$/i)) {
+                mediaPreview = `<video src="${data.image_url}" style="max-width: 100px; border-radius: 5px;" controls></video>`;
+            } else {
+                mediaPreview = `<img src="${data.image_url}" style="max-width: 100px; border-radius: 5px;" alt="Image du modèle">`;
+            }
+        }
+        
+        dialog.innerHTML = `
+            <h3 style="margin-top: 0; color: #25D366;">Partager le modèle : ${data.title}</h3>
+            <div style="background: #f5f5f5; padding: 10px; border-radius: 5px; margin: 10px 0; max-height: 100px; overflow-y: auto;">
+                ${data.content}
+            </div>
+            ${mediaPreview ? `<div style="margin: 10px 0;">${mediaPreview}</div>` : ''}
+            <h4>Choisir la destination:</h4>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button onclick="shareTemplateToGroup('${templateId}')" style="background: #25D366; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">👥 Partager dans le groupe</button>
+                <button onclick="shareTemplateToBroadcast('${templateId}')" style="background: #075E54; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">📢 Diffuser à tous</button>
+                <button onclick="showTemplateMemberSelection('${templateId}')" style="background: #ffc107; color: black; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">👤 Partager à un membre</button>
+            </div>
+            <div style="margin-top: 15px; text-align: right;">
+                <button onclick="this.closest('.modal-template-share').remove()" style="background: #ccc; border: none; padding: 8px 15px; border-radius: 5px; margin-right: 10px;">Annuler</button>
+            </div>
+        `;
+        
+        modal.className = 'modal-template-share';
+        modal.appendChild(dialog);
+        document.body.appendChild(modal);
+        
+        // Fermer en cliquant à l'extérieur
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
         
     } catch (err) {
         console.error('Erreur partage modèle:', err);
         alert('Erreur lors du partage du modèle');
+    }
+}
+
+async function shareTemplateToGroup(templateId) {
+    try {
+        const { data, error } = await _supabase
+            .from('message_templates')
+            .select('*')
+            .eq('id', templateId)
+            .single();
+        
+        if (error) throw error;
+        
+        const messageData = {
+            sender_id: currentUser.id,
+            sender_phone: currentProfile.phone,
+            content: `*Modèle partagé: ${data.title}*\n\n${data.content}`,
+            image_url: data.image_url,
+            time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
+        };
+        
+        const { error: insertError } = await _supabase.from('messages').insert([messageData]);
+        
+        if (insertError) throw insertError;
+        
+        alert('Modèle partagé dans le groupe avec succès!');
+        document.querySelector('.modal-template-share').remove();
+        
+    } catch (err) {
+        console.error('Erreur partage modèle groupe:', err);
+        alert('Erreur lors du partage dans le groupe');
+    }
+}
+
+async function shareTemplateToBroadcast(templateId) {
+    try {
+        const { data, error } = await _supabase
+            .from('message_templates')
+            .select('*')
+            .eq('id', templateId)
+            .single();
+        
+        if (error) throw error;
+        
+        const { data: allMembers, error: errMem } = await _supabase.from('profiles').select('id');
+        if(errMem) throw errMem;
+        
+        const messages = allMembers.map(member => ({
+            from_id: currentUser.id,
+            to_id: member.id,
+            content: `*Modèle partagé: ${data.title}*\n\n${data.content}`,
+            sender_phone: currentProfile.phone,
+            image_url: data.image_url,
+            time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
+        }));
+
+        const { error: broadcastError } = await _supabase.from('inbox').insert(messages);
+
+        if(broadcastError) throw broadcastError;
+        
+        alert('Modèle diffusé avec succès à tous les membres!');
+        document.querySelector('.modal-template-share').remove();
+        
+    } catch (err) {
+        console.error('Erreur diffusion modèle:', err);
+        alert('Erreur lors de la diffusion du modèle');
+    }
+}
+
+async function showTemplateMemberSelection(templateId) {
+    try {
+        const { data: members, error } = await _supabase
+            .from('profiles')
+            .select('id, phone, is_admin')
+            .neq('id', currentUser.id);
+        
+        if (error) throw error;
+        
+        const modal = document.querySelector('.modal-template-share');
+        const dialog = modal.querySelector('div');
+        
+        // Mettre à jour le dialogue pour la sélection des membres
+        dialog.innerHTML = `
+            <h3 style="margin-top: 0; color: #25D366;">Partager à un membre</h3>
+            <input type="text" id="template-share-search" placeholder="🔍 Rechercher un membre..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px;" oninput="filterTemplateShareMembers()">
+            <div id="template-share-members-list" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
+                ${members.map(member => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;" onmouseover="this.style.backgroundColor='#f5f5f5'" onmouseout="this.style.backgroundColor=''">
+                        <span>${member.phone}${member.is_admin ? ' ⭐' : ''}</span>
+                        <button onclick="shareTemplateToInbox('${templateId}', '${member.id}', '${member.phone}')" style="background: #075E54; color: white; border: none; padding: 6px 12px; border-radius: 5px; font-size: 12px;">Partager</button>
+                    </div>
+                `).join('')}
+            </div>
+            <div style="margin-top: 15px; text-align: right;">
+                <button onclick="this.closest('.modal-template-share').remove()" style="background: #ccc; border: none; padding: 8px 15px; border-radius: 5px; margin-right: 10px;">Annuler</button>
+            </div>
+        `;
+        
+    } catch (err) {
+        console.error('Erreur sélection membres:', err);
+        alert('Erreur lors du chargement des membres');
+    }
+}
+
+async function shareTemplateToInbox(templateId, memberId, memberPhone) {
+    try {
+        const { data, error } = await _supabase
+            .from('message_templates')
+            .select('*')
+            .eq('id', templateId)
+            .single();
+        
+        if (error) throw error;
+        
+        const messageData = {
+            from_id: currentUser.id,
+            to_id: memberId,
+            content: `*Modèle partagé: ${data.title}*\n\n${data.content}`,
+            sender_phone: currentProfile.phone,
+            image_url: data.image_url,
+            time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
+        };
+        
+        const { error: insertError } = await _supabase.from('inbox').insert([messageData]);
+        
+        if (insertError) throw insertError;
+        
+        alert(`Modèle partagé à ${memberPhone} avec succès!`);
+        document.querySelector('.modal-template-share').remove();
+        
+    } catch (err) {
+        console.error('Erreur partage modèle inbox:', err);
+        alert('Erreur lors du partage en privé');
     }
 }
 
