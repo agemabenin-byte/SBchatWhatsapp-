@@ -234,15 +234,23 @@ async function handleSend() {
         try {
             if(file.type.startsWith('video/')) {
                 // Vidéo → compte dédié dn3vf0mhm
+                console.log('Upload vidéo détecté:', file.name, file.type);
                 const formData = new FormData();
                 formData.append('file', file);
-                formData.append('upload_preset', "video_preset");
+                formData.append('upload_preset', "chat_preset");
+                console.log('Envoi vers dn3vf0mhm/video/upload avec preset chat_preset');
                 const response = await fetch(`https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`, {
                     method: 'POST', body: formData
                 });
                 const data = await response.json();
-                if(data.secure_url) url = data.secure_url;
-                else throw new Error("URL vidéo manquante");
+                console.log('Réponse Cloudinary vidéo:', data);
+                if(data.secure_url) {
+                    url = data.secure_url;
+                    console.log('URL vidéo obtenue:', url);
+                } else {
+                    console.error('Réponse Cloudinary sans URL:', data);
+                    throw new Error("URL vidéo manquante");
+                }
             } else {
                 // Image → compte dtkssnhub
                 const formData = new FormData();
