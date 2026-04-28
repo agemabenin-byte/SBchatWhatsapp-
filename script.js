@@ -232,19 +232,34 @@ async function handleSend() {
         window.templateMediaUrl = null; // Réinitialiser après utilisation
     } else if(file) {
         try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('upload_preset', "chat_preset");
-            const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
-                method: 'POST', body: formData
-            });
-            const data = await response.json();
-            if(data.secure_url) url = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
-        } catch (err) { console.error(err); return alert("Erreur image."); }
+            if(file.type.startsWith('video/')) {
+                // Vidéo → compte dédié dn3vf0mhm
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', "video_preset");
+                const response = await fetch(`https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`, {
+                    method: 'POST', body: formData
+                });
+                const data = await response.json();
+                if(data.secure_url) url = data.secure_url;
+                else throw new Error("URL vidéo manquante");
+            } else {
+                // Image → compte dtkssnhub
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', "chat_preset");
+                const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
+                    method: 'POST', body: formData
+                });
+                const data = await response.json();
+                if(data.secure_url) url = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+                else throw new Error("URL image manquante");
+            }
+        } catch (err) { console.error(err); return alert("Erreur upload fichier."); }
     }
 
     // Conserver les retours à la ligne dans le contenu
-    const processedContent = content.replace(/\n/g, '\n');
+    const processedContent = content;
 
     await _supabase.from('messages').insert([{
         sender_id: currentUser.id, 
@@ -326,7 +341,7 @@ async function executeSendPrivate() {
     }
 
     // Conserver les retours à la ligne dans le contenu
-    const processedContent = content.replace(/\n/g, '\n');
+    const processedContent = content;
 
     // On inclut maintenant le sender_phone puisque la colonne existe
     const { error } = await _supabase.from('inbox').insert([{
@@ -510,7 +525,7 @@ async function executeBroadcast() {
     }
     
     // Conserver les retours à la ligne dans le contenu
-    const processedContent = content.replace(/\n/g, '\n');
+    const processedContent = content;
     
     // Préparation de l'envoi groupé avec ton numéro et le média
     const messages = allMembers.map(member => ({
@@ -726,9 +741,20 @@ function getEditorContent(targetId) {
     const editor = document.getElementById(targetId);
     if (!editor) return '';
     
-    // Obtenir le contenu texte brut
-    let text = editor.textContent || editor.innerText || '';
-    return text.trim();
+    // Récupérer le HTML et convertir les balises de saut en \n
+    let html = editor.innerHTML;
+    let text = html
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/div>/gi, '\n')
+        .replace(/<\/p>/gi, '\n')
+        .replace(/<[^>]+>/g, '')   // Supprimer les autres balises
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>');
+    
+    // Nettoyer les sauts de ligne excessifs
+    return text.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 // Fonction pour définir le contenu de l'éditeur
