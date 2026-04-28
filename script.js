@@ -237,8 +237,8 @@ async function handleSend() {
                 console.log('Upload vidéo détecté:', file.name, file.type);
                 const formData = new FormData();
                 formData.append('file', file);
-                formData.append('upload_preset', "chat_preset");
-                console.log('Envoi vers dn3vf0mhm/video/upload avec preset chat_preset');
+                formData.append('upload_preset', "video_preset");
+                console.log('Envoi vers dn3vf0mhm/video/upload avec preset video_preset');
                 const response = await fetch(`https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`, {
                     method: 'POST', body: formData
                 });
@@ -331,7 +331,17 @@ async function executeSendPrivate() {
     if(!mediaUrl && file) {
         try {
             if(file.type.startsWith('video/')) {
-                mediaUrl = await uploadToVideoCloud(file);
+                console.log('Upload vidéo inbox détecté:', file.name, file.type);
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', "video_preset");
+                console.log('Envoi vers dn3vf0mhm/video/upload avec preset video_preset');
+                const response = await fetch(`https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`, {
+                    method: 'POST', body: formData
+                });
+                const data = await response.json();
+                if(data.secure_url) mediaUrl = data.secure_url;
+                else throw new Error("URL vidéo manquante");
             } else {
                 const formData = new FormData();
                 formData.append('file', file);
@@ -515,7 +525,17 @@ async function executeBroadcast() {
     if(!mediaUrl && file) {
         try {
             if(file.type.startsWith('video/')) {
-                mediaUrl = await uploadToVideoCloud(file);
+                console.log('Upload vidéo broadcast détecté:', file.name, file.type);
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', "video_preset");
+                console.log('Envoi vers dn3vf0mhm/video/upload avec preset video_preset');
+                const response = await fetch(`https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`, {
+                    method: 'POST', body: formData
+                });
+                const data = await response.json();
+                if(data.secure_url) mediaUrl = data.secure_url;
+                else throw new Error("URL vidéo manquante");
             } else {
                 const formData = new FormData();
                 formData.append('file', file);
@@ -1597,7 +1617,17 @@ async function saveTemplate() {
             const data = await response.json();
             if (data.secure_url) mediaUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
         } else if (videoFile) {
-            mediaUrl = await uploadToVideoCloud(videoFile);
+            console.log('Upload vidéo template détecté:', videoFile.name, videoFile.type);
+            const formData = new FormData();
+            formData.append('file', videoFile);
+            formData.append('upload_preset', "video_preset");
+            console.log('Envoi vers dn3vf0mhm/video/upload avec preset video_preset');
+            const response = await fetch(`https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`, {
+                method: 'POST', body: formData
+            });
+            const data = await response.json();
+            if(data.secure_url) mediaUrl = data.secure_url;
+            else throw new Error("URL vidéo manquante");
         }
         
         const { error } = await _supabase.from('message_templates').insert([{
