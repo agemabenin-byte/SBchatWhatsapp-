@@ -2171,7 +2171,7 @@ async function handleBroadcastMedia(type) {
                 
                 // Optionnel : On affiche un petit indicateur visuel ou on met l'URL dans le texte
                 const broadcastInput = document.getElementById('broadcast-msg');
-                broadcastInput.innerText += "\n(Fichier joint prêt)"; 
+                broadcastInput.innerText += "\nFichier joint"; 
                 
                 console.log("Média prêt pour la diffusion :", window.templateMediaUrl);
             }
