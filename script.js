@@ -2117,93 +2117,65 @@ async function handleForgotPassword() {
 }
 
 // Définition de la fonction de gestion des médias pour la diffusion (appelée dès qu'on choisit un fichier).
+// Nouvelle version harmonisée pour la diffusion
 async function handleBroadcastMedia(type) {
-    // Détermine l'ID de l'élément HTML à utiliser selon si c'est une image ou une vidéo/fichier.
+    // 1. Sélection de l'input selon le type (image ou vidéo)
     const inputId = type === 'image' ? 'bc-photo-input' : 'bc-video-input';
-    
-    // Récupère le premier fichier sélectionné dans l'input correspondant.
     const file = document.getElementById(inputId).files[0];
-    
-    // Si aucun fichier n'est trouvé (annulation du choix), on arrête la fonction.
     if (!file) return;
 
-    // --- ACTIVATION BARRE DE PROGRESSION ---
-    // Récupère les éléments HTML qui servent à afficher la progression de l'envoi.
+    // 2. Préparation visuelle de la barre de progression
     const progressContainer = document.getElementById('upload-progress-container');
     const progressBar = document.getElementById('upload-progress-bar');
     const progressText = document.getElementById('upload-progress-text');
     
-    // Affiche le conteneur de progression (qui est caché par défaut).
     progressContainer.style.display = 'flex';
-    // Initialise la barre à 0% visuellement.
     progressBar.style.width = '0%';
-    // Met à jour le texte pour indiquer le début du processus.
     progressText.innerText = '0%';
 
-    // Crée une nouvelle requête HTTP (XMLHttpRequest) pour envoyer le fichier sans recharger la page.
     const xhr = new XMLHttpRequest();
-    // Crée un objet FormData pour empaqueter le fichier comme un formulaire classique.
     const formData = new FormData();
-    // Ajoute le fichier physique à l'envoi sous la clé 'file'.
     formData.append('file', file);
 
-    // Écouteur d'événement qui surveille l'avancement de l'envoi vers Cloudinary.
+    // 3. Suivi de la progression de l'upload
     xhr.upload.addEventListener("progress", (e) => {
-        // Vérifie si la taille totale du fichier est connue pour calculer un pourcentage.
         if (e.lengthComputable) {
-            // Calcule le pourcentage (octets chargés divisés par octets totaux, multiplié par 100).
             const percent = Math.round((e.loaded / e.total) * 100);
-            // Met à jour la largeur de la barre verte en fonction du pourcentage.
             progressBar.style.width = percent + '%';
-            // Affiche le texte de progression en temps réel pour l'utilisateur.
-            progressText.innerText = `Préparation diffusion : ${percent}%`;
+            progressText.innerText = `Téléchargement : ${percent}%`;
         }
     });
 
-    // Écouteur d'événement qui se déclenche quand l'upload vers Cloudinary est terminé.
+    // 4. Une fois l'upload terminé sur Cloudinary
     xhr.addEventListener("load", async () => {
-        // Cache la barre de progression car le travail est fini.
         progressContainer.style.display = 'none';
-        
-        // Vérifie si le serveur (Cloudinary) a répondu avec un code de succès (200).
         if (xhr.status === 200) {
-            // Convertit la réponse texte du serveur en objet JavaScript (JSON).
             const data = JSON.parse(xhr.responseText);
-            
-            // Si Cloudinary renvoie bien l'adresse sécurisée (URL) du fichier hébergé.
             if (data.secure_url) {
-                // Récupère la zone de texte où l'on écrit le message de diffusion.
+                // --- ACTION CRUCIALE ---
+                // On stocke l'URL dans une variable globale que executeBroadcast pourra lire
+                window.templateMediaUrl = data.secure_url;
+                
+                // Optionnel : On affiche un petit indicateur visuel ou on met l'URL dans le texte
                 const broadcastInput = document.getElementById('broadcast-msg');
+                broadcastInput.innerText += "\n(Fichier joint prêt)"; 
                 
-                // --- NOTE IMPORTANTE : C'EST ICI QUE L'URL EST AJOUTÉE ---
-                // Ajoute l'URL reçue à la fin du texte existant (avec un retour à la ligne si besoin).
-                // Attention: Ici on l'ajoute au TEXTE, pas dans une variable image_url séparée !
-                broadcastInput.value = (broadcastInput.value ? broadcastInput.value + "\n" : "") + data.secure_url;
-                
-                // Vide l'input de fichier pour permettre d'en choisir un autre plus tard.
-                // C'est pourquoi executeBroadcast ne trouvait plus de fichier après !
-                document.getElementById(inputId).value = "";
+                console.log("Média prêt pour la diffusion :", window.templateMediaUrl);
             }
         } else {
-            // Affiche une alerte si Cloudinary a refusé le fichier ou s'il y a eu un bug serveur.
-            alert("Erreur lors de l'upload.");
+            alert("Erreur lors du chargement du média.");
         }
     });
 
-    // Configuration de la destination selon le type de média.
+    // 5. Choix du compte Cloudinary (dtkssnhub pour images, dn3vf0mhm pour vidéos)
     if (type === 'image') {
-        // Pour les images : on utilise le preset 'chat_preset' et le compte 'dtkssnhub'.
         formData.append('upload_preset', "chat_preset");
         xhr.open("POST", `https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`);
     } else {
-        // Pour les vidéos ou autres fichiers : on utilise 'video_preset' et le compte 'dn3vf0mhm'.
         formData.append('upload_preset', "video_preset");
-        // Détermine si Cloudinary doit traiter cela comme une "video" ou un fichier brut ("raw").
         const resourceType = file.type.startsWith('video/') ? "video" : "raw";
         xhr.open("POST", `https://api.cloudinary.com/v1_1/dn3vf0mhm/${resourceType}/upload`);
     }
-    
-    // Envoie officiellement les données (le fichier + le preset) vers Cloudinary.
     xhr.send(formData);
 }
 
