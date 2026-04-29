@@ -59,8 +59,9 @@
 </div>
 
     <div id="page-chat" class="page" style="display:none;">
-        <div id="groupChoice" style="padding:10px; background:#fff; text-align:center;">
-            <b id="welcomeText">Salut ...</b>
+        <div id="groupChoice" style="padding:10px; background:#fff; text-align:center; display:flex; align-items:center; justify-content:center; gap:10px;">
+            <b id="welcomeText" style="font-size:14px;">Salut ...</b>
+            <input type="text" id="chat-search" placeholder="🔍 Rechercher..." style="padding:5px 10px; border-radius:15px; border:1px solid #ddd; background:#f5f5f5; color:#075E54; outline:none; width:120px; font-size:12px;" oninput="filterChatMessages()">
         </div>
 
         <div class="header">
@@ -73,7 +74,6 @@
             </div>
             
             <div style="display:flex; align-items:center; gap:20px;">
-                <input type="text" id="chat-search" placeholder="🔍..." style="padding:5px 10px; border-radius:15px; border:1px solid white; background:rgba(255,255,255,0.9); color:#075E54; outline:none; width:58px; margin-right:auto;" oninput="filterChatMessages()">
                 <div id="adminMenuBtn" onclick="toggleMenu()" style="color:black; font-size:24px; font-weight:bold; background:rgba(255,255,255,0.8); padding:5px 8px; border-radius:25%; flex-shrink:0;">⋮</div>
             </div>
             <div id="adminDropdown" class="dropdown-content">
@@ -186,9 +186,9 @@
         <div class="header">
             <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
             <div style="flex:1; display:flex; justify-content:center; align-items:center; padding:0 60px;">
-                <b>Modèles Messages</b>
+                <b>Modèles</b>
             </div>
-            <button onclick="toggleCreateTemplate()" style="background:white; color:#25D366; border:none; padding:5px 10px; border-radius:5px; font-size:12px; position:absolute; right:20px;">+ Créer</button>
+            <input type="text" id="templates-search" placeholder="🔍..." style="padding:5px 10px; border-radius:15px; border:1px solid white; background:rgba(255,255,255,0.9); color:#075E54; outline:none; width:64px; position:absolute; right:20px;" oninput="filterTemplates()">
         </div>
         
         <div id="templates-list" class="messages" style="padding:10px;">
@@ -196,72 +196,6 @@
         </div>
     </div>
 
-    <!-- Sélecteur d'émoticônes -->
-<div id="emoji-picker" class="emoji-picker">
-    <div class="emoji-category">Informatique</div>
-    <div class="emoji-grid">
-        <button class="emoji-btn" onclick="insertEmoji('💻')">💻</button>
-        <button class="emoji-btn" onclick="insertEmoji('🖥️')">🖥️</button>
-        <button class="emoji-btn" onclick="insertEmoji('⌨️')">⌨️</button>
-        <button class="emoji-btn" onclick="insertEmoji('🖱️')">🖱️</button>
-        <button class="emoji-btn" onclick="insertEmoji('📱')">📱</button>
-        <button class="emoji-btn" onclick="insertEmoji('💾')">💾</button>
-        <button class="emoji-btn" onclick="insertEmoji('💿')">💿</button>
-        <button class="emoji-btn" onclick="insertEmoji('📀')">📀</button>
-        <button class="emoji-btn" onclick="insertEmoji('🖨️')">🖨️</button>
-        <button class="emoji-btn" onclick="insertEmoji('📠')">📠</button>
-        <button class="emoji-btn" onclick="insertEmoji('📡')">📡</button>
-        <button class="emoji-btn" onclick="insertEmoji('📞')">📞</button>
-    </div>
-    
-    <div class="emoji-category">Cœurs</div>
-    <div class="emoji-grid">
-        <button class="emoji-btn" onclick="insertEmoji('❤️')">❤️</button>
-        <button class="emoji-btn" onclick="insertEmoji('💚')">💚</button>
-        <button class="emoji-btn" onclick="insertEmoji('💛')">💛</button>
-        <button class="emoji-btn" onclick="insertEmoji('💗')">💗</button>
-        <button class="emoji-btn" onclick="insertEmoji('💓')">💓</button>
-        <button class="emoji-btn" onclick="insertEmoji('💕')">💕</button>
-        <button class="emoji-btn" onclick="insertEmoji('💖')">💖</button>
-        <button class="emoji-btn" onclick="insertEmoji('💘')">💘</button>
-        <button class="emoji-btn" onclick="insertEmoji('💝')">💝</button>
-        <button class="emoji-btn" onclick="insertEmoji('💞')">💞</button>
-        <button class="emoji-btn" onclick="insertEmoji('💟')">💟</button>
-        <button class="emoji-btn" onclick="insertEmoji('💌')">💌</button>
-    </div>
-    
-    <div class="emoji-category">Bureautique</div>
-    <div class="emoji-grid">
-        <button class="emoji-btn" onclick="insertEmoji('📌')">📌</button>
-        <button class="emoji-btn" onclick="insertEmoji('📍')">📍</button>
-        <button class="emoji-btn" onclick="insertEmoji('📎')">📎</button>
-        <button class="emoji-btn" onclick="insertEmoji('🖇️')">🖇️</button>
-        <button class="emoji-btn" onclick="insertEmoji('📏')">📏</button>
-        <button class="emoji-btn" onclick="insertEmoji('📐')">📐</button>
-        <button class="emoji-btn" onclick="insertEmoji('✂️')">✂️</button>
-        <button class="emoji-btn" onclick="insertEmoji('📝')">📝</button>
-        <button class="emoji-btn" onclick="insertEmoji('📄')">📄</button>
-        <button class="emoji-btn" onclick="insertEmoji('📃')">📃</button>
-        <button class="emoji-btn" onclick="insertEmoji('📋')">📋</button>
-        <button class="emoji-btn" onclick="insertEmoji('📁')">📁</button>
-    </div>
-    
-    <div class="emoji-category">Divers</div>
-    <div class="emoji-grid">
-        <button class="emoji-btn" onclick="insertEmoji('🌍')">🌍</button>
-        <button class="emoji-btn" onclick="insertEmoji('🌐')">🌐</button>
-        <button class="emoji-btn" onclick="insertEmoji('⭐')">⭐</button>
-        <button class="emoji-btn" onclick="insertEmoji('✨')">✨</button>
-        <button class="emoji-btn" onclick="insertEmoji('🔥')">🔥</button>
-        <button class="emoji-btn" onclick="insertEmoji('✅')">✅</button>
-        <button class="emoji-btn" onclick="insertEmoji('❌')">❌</button>
-        <button class="emoji-btn" onclick="insertEmoji('⚠️')">⚠️</button>
-        <button class="emoji-btn" onclick="insertEmoji('🚀')">🚀</button>
-        <button class="emoji-btn" onclick="insertEmoji('💡')">💡</button>
-        <button class="emoji-btn" onclick="insertEmoji('🎯')">🎯</button>
-        <button class="emoji-btn" onclick="insertEmoji('🏆')">🏆</button>
-    </div>
-</div>
 
     <script src="script.js" defer></script>
 </body>
