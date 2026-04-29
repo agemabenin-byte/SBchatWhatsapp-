@@ -1116,6 +1116,16 @@ function filterMembers() {
     });
 }
 
+function filterTemplates() {
+    const searchTerm = document.getElementById('templates-search').value.toLowerCase();
+    const templates = document.querySelectorAll('#templates-list > div');
+    
+    templates.forEach(template => {
+        const text = template.textContent.toLowerCase();
+        template.style.display = text.includes(searchTerm) ? 'block' : 'none';
+    });
+}
+
 function filterShareMembers() {
     const searchTerm = document.getElementById('share-search').value.toLowerCase();
     const members = document.querySelectorAll('#share-members-list > div');
@@ -1956,7 +1966,7 @@ async function shareTemplateToGroup(templateId) {
         const messageData = {
             sender_id: currentUser.id,
             sender_phone: currentProfile.phone,
-            content: `*Modèle partagé: ${data.title}*\n\n${data.content}`,
+            content: `*✨: ${data.title}*\n\n${data.content}`,
             image_url: data.image_url,
             time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
         };
@@ -1990,7 +2000,7 @@ async function shareTemplateToBroadcast(templateId) {
         const messages = allMembers.map(member => ({
             from_id: currentUser.id,
             to_id: member.id,
-            content: `*Modèle partagé: ${data.title}*\n\n${data.content}`,
+            content: `*✨: ${data.title}*\n\n${data.content}`,
             sender_phone: currentProfile.phone,
             image_url: data.image_url,
             time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
@@ -2057,7 +2067,7 @@ async function shareTemplateToInbox(templateId, memberId, memberPhone) {
         const messageData = {
             from_id: currentUser.id,
             to_id: memberId,
-            content: `*Modèle partagé: ${data.title}*\n\n${data.content}`,
+            content: `*✨: ${data.title}*\n\n${data.content}`,
             sender_phone: currentProfile.phone,
             image_url: data.image_url,
             time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
