@@ -1140,6 +1140,16 @@ function filterShareMembers() {
     });
 }
 
+function filterTemplateShareMembers() {
+    const searchTerm = document.getElementById('template-share-search').value.toLowerCase();
+    const members = document.querySelectorAll('#template-share-members-list > div');
+    
+    members.forEach(member => {
+        const text = member.textContent.toLowerCase();
+        member.style.display = text.includes(searchTerm) ? 'flex' : 'none';
+    });
+}
+
 // --- FONCTION DE TRAITEMENT DU TEXTE ---
 function processMessageContent(content) {
     if (!content) return '';
