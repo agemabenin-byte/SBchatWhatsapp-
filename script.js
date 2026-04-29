@@ -526,7 +526,7 @@ async function executeBroadcast() {
     if(!allMembers || allMembers.length === 0) return alert("Aucun membre trouvé.");
     
     // 3. Gestion du média (Image ou Vidéo)
-    // On vérifie s'il y a un média déjà pré-chargé ou un fichier sélectionné dans les inputs HTML.
+    // On vérifie s'il y a un média déjà pré-chargé via handleBroadcastMedia ou un fichier sélectionné dans les inputs HTML.
     let mediaUrl = window.templateMediaUrl || null;
     const fileInput = document.getElementById('bc-photo-input');
     const videoInput = document.getElementById('bc-video-input');
@@ -562,7 +562,7 @@ async function executeBroadcast() {
                 });
                 const data = await response.json();
                 
-                // Optimisation de l'image si l'upload a réussi
+                // Optimisation du média si l'upload a réussi
                 if(data.secure_url) {
                     mediaUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
                 }
@@ -2153,8 +2153,11 @@ async function handleBroadcastMedia(type) {
             const data = JSON.parse(xhr.responseText);
             if (data.secure_url) {
                 // --- ACTION CRUCIALE ---
-                // On stocke l'URL dans une variable globale que executeBroadcast pourra lire
-                window.templateMediaUrl = data.secure_url;
+                // On stocke l'URL optimisée dans une variable globale que executeBroadcast pourra lire
+                const optimizedUrl = type === 'image' ? 
+                    data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/') : 
+                    data.secure_url;
+                window.templateMediaUrl = optimizedUrl;
                 
                 // Optionnel : On affiche un petit indicateur visuel ou on met l'URL dans le texte
                 const broadcastInput = document.getElementById('broadcast-msg');
