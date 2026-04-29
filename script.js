@@ -508,77 +508,107 @@ async function loadInbox() {
     }
 }
 
-// --- DIFFUSION (BROADCAST) - RÉPARÉ ---
+// --- NOUVELLE FONCTION DE DIFFUSION (BROADCAST) ---
+// Cette version utilise la même logique d'upload que executeSendPrivate pour garantir le remplissage de image_url.
 async function executeBroadcast() {
+    // 1. Récupération du message depuis l'éditeur de diffusion
     const content = getEditorContent('broadcast-msg');
+    
+    // Vérification de sécurité : message vide ?
     if(!content) return alert("Entrez un message !");
 
+    // 2. Récupération de tous les membres (destinataires)
+    // On récupère les IDs pour savoir à qui envoyer le message.
     const { data: allMembers, error: errMem } = await _supabase.from('profiles').select('id');
-    if(errMem) return alert("Erreur membres: " + errMem.message);
     
-    // Vérifier s'il y a un média de modèle ou un fichier uploadé
+    // Si la base de données ne répond pas, on arrête tout.
+    if(errMem) return alert("Erreur membres: " + errMem.message);
+    if(!allMembers || allMembers.length === 0) return alert("Aucun membre trouvé.");
+    
+    // 3. Gestion du média (Image ou Vidéo)
+    // On vérifie s'il y a un média déjà pré-chargé ou un fichier sélectionné dans les inputs HTML.
     let mediaUrl = window.templateMediaUrl || null;
     const fileInput = document.getElementById('bc-photo-input');
     const videoInput = document.getElementById('bc-video-input');
     const file = fileInput.files[0] || videoInput.files[0];
     
+    // Si on a un fichier physique mais pas encore d'URL Cloudinary, on lance l'upload.
     if(!mediaUrl && file) {
         try {
+            // Logique identique à executeSendPrivate pour la vidéo
             if(file.type.startsWith('video/')) {
-                console.log('Upload vidéo broadcast détecté:', file.name, file.type);
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('upload_preset', "video_preset");
-                console.log('Envoi vers dn3vf0mhm/video/upload avec preset video_preset');
+                
                 const response = await fetch(`https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`, {
                     method: 'POST', body: formData
                 });
                 const data = await response.json();
-                if(data.secure_url) mediaUrl = data.secure_url;
-                else throw new Error("URL vidéo manquante");
+                
+                if(data.secure_url) {
+                    mediaUrl = data.secure_url; // L'URL finale pour la table inbox
+                } else {
+                    throw new Error("URL vidéo manquante");
+                }
             } else {
+                // Logique identique à executeSendPrivate pour l'image
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('upload_preset', "chat_preset");
+                
                 const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
                     method: 'POST', body: formData
                 });
                 const data = await response.json();
-                if(data.secure_url) mediaUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+                
+                // Optimisation de l'image si l'upload a réussi
+                if(data.secure_url) {
+                    mediaUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+                }
             }
         } catch (err) { 
-            console.error(err); 
-            return alert("Erreur fichier."); 
+            console.error("Erreur Upload Cloudinary:", err); 
+            return alert("Erreur lors de l'envoi du fichier."); 
         }
     }
-    
-    // Conserver les retours à la ligne dans le contenu
+
+    // 4. Préparation de l'envoi groupé
+    // On transforme notre liste de membres en un tableau d'objets conformes à ta table 'inbox' (vue en capture d'écran).
     const processedContent = content;
-    
-    // Préparation de l'envoi groupé avec ton numéro et le média
+    const timeFormatted = new Date().toLocaleString('fr-FR', {
+        day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'
+    });
+
     const messages = allMembers.map(member => ({
         from_id: currentUser.id,
         to_id: member.id,
         content: processedContent,
-        sender_phone: currentProfile.phone, // On identifie l'admin par son numéro
-        image_url: mediaUrl,
-        time: new Date().toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
+        sender_phone: currentProfile.phone, // Utilise ton numéro admin
+        image_url: mediaUrl,               // L'URL qu'on vient de récupérer de Cloudinary
+        time: timeFormatted,
+        is_read: false                     // Valeur par défaut pour la nouvelle colonne
     }));
 
+    // 5. Insertion massive dans Supabase
+    // On envoie tout le tableau d'un coup pour être efficace.
     const { error } = await _supabase.from('inbox').insert(messages);
 
     if(error) {
         alert("Erreur diffusion : " + error.message);
     } else {
-        alert("Message diffusé avec succès !");
+        alert("Message diffusé avec succès à tous les membres !");
+        
+        // 6. Nettoyage complet de l'interface
         clearEditor('broadcast-msg');
         document.getElementById('bc-photo-input').value = "";
         document.getElementById('bc-video-input').value = "";
-        window.templateMediaUrl = null; // Réinitialiser le média du modèle
+        window.templateMediaUrl = null; 
+        
+        // Retour à l'accueil ou page précédente
         goBack();
     }
 }
-
 
 // --- LISTE DES MEMBRES (OPTIMISÉE) ---
 async function loadMembers() {
