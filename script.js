@@ -2495,6 +2495,319 @@ async function handleAdminFileSelect() {
     xhr.send(formData);
 }
 
+// --- FONCTIONNALITÉS PARAMÈTRES ---
+
+// Variable globale pour l'état de verrouillage du groupe (sera synchronisée avec Supabase)
+let isGroupLocked = false;
+
+// Fonction pour afficher/masquer le bouton paramètres selon le rôle
+function gererAffichageAdmin(phone) {
+    const isAdmin = ADMINS_PHONES.includes(phone);
+    const settingsBtn = document.getElementById('settings-btn');
+    
+    if (isAdmin && settingsBtn) {
+        settingsBtn.style.display = 'block';
+    }
+}
+
+// Fonction pour vérifier l'état de verrouillage depuis Supabase
+async function checkGroupLockStatus() {
+    try {
+        // On utilise une table settings ou on stocke dans profiles
+        const { data, error } = await _supabase
+            .from('app_settings')
+            .select('is_group_locked')
+            .eq('id', 1)
+            .single();
+            
+        if (error) {
+            // Si la table n'existe pas encore, on la crée
+            if (error.code === 'PGRST116') {
+                await _supabase.from('app_settings').insert([{
+                    id: 1,
+                    is_group_locked: false
+                }]);
+                return false;
+            }
+            console.error('Erreur vérification verrouillage:', error);
+            return false;
+        }
+        
+        return data ? data.is_group_locked : false;
+    } catch (err) {
+        console.error('Erreur checkGroupLockStatus:', err);
+        return false;
+    }
+}
+
+// Fonction pour synchroniser l'interface avec l'état réel du serveur
+async function syncLockButtonUI() {
+    try {
+        const realStatus = await checkGroupLockStatus();
+        const btn = document.getElementById('lockGroupBtn');
+        
+        if (btn) {
+            if (realStatus) {
+                btn.innerHTML = "🔓 Déverrouiller le groupe";
+                btn.style.background = "#dc3545";
+            } else {
+                btn.innerHTML = "🔒 Vérouiller le groupe";
+                btn.style.background = "#25D366";
+            }
+        }
+        
+        // Synchroniser la variable globale
+        isGroupLocked = realStatus;
+        
+    } catch (err) {
+        console.error('Erreur synchronisation UI:', err);
+    }
+}
+
+// Fonction pour basculer le verrouillage du groupe (sécurisée côté serveur)
+async function toggleGroupLock() {
+    // Vérifier si l'utilisateur est admin
+    if (!currentProfile || !currentProfile.is_admin && !ADMINS_PHONES.includes(currentProfile.phone)) {
+        alert("Seuls les administrateurs peuvent verrouiller le groupe.");
+        return;
+    }
+    
+    try {
+        // Récupérer l'état actuel depuis Supabase (toujours depuis le serveur)
+        const currentStatus = await checkGroupLockStatus();
+        const newStatus = !currentStatus;
+        
+        if (newStatus) {
+            if (!confirm("Voulez-vous vraiment verrouiller le groupe ? Les membres non-admins ne pourront plus envoyer de messages.")) {
+                return;
+            }
+        } else {
+            if (!confirm("Voulez-vous vraiment déverrouiller le groupe ?")) {
+                return;
+            }
+        }
+        
+        // Mettre à jour dans Supabase
+        const { error } = await _supabase
+            .from('app_settings')
+            .update({ is_group_locked: newStatus })
+            .eq('id', 1);
+            
+        if (error) {
+            alert("Erreur lors de la mise à jour: " + error.message);
+            // Resynchroniser l'interface en cas d'erreur
+            await syncLockButtonUI();
+            return;
+        }
+        
+        // Synchroniser l'interface avec le nouvel état
+        await syncLockButtonUI();
+        
+        // Afficher le message de confirmation
+        if (newStatus) {
+            alert("Le groupe est maintenant verrouillé.");
+        } else {
+            alert("Le groupe est maintenant déverrouillé.");
+        }
+        
+    } catch (err) {
+        console.error('Erreur toggleGroupLock:', err);
+        alert("Erreur lors du changement de statut du groupe.");
+        // Resynchroniser l'interface en cas d'erreur
+        await syncLockButtonUI();
+    }
+}
+
+// Fonction pour afficher le popup de groupe verrouillé
+function showLockPopup() {
+    document.getElementById('lockPopup').style.display = 'flex';
+}
+
+// Fonction pour fermer le popup de groupe verrouillé
+function closeLockPopup() {
+    document.getElementById('lockPopup').style.display = 'none';
+}
+
+// Fonctions pour changer les arrière-plans
+function changeGroupBackground() {
+    document.getElementById('group-bg-input').click();
+}
+
+function changeInboxBackground() {
+    document.getElementById('inbox-bg-input').click();
+}
+
+function changeMembersBackground() {
+    document.getElementById('members-bg-input').click();
+}
+
+// Fonctions pour gérer le changement d'arrière-plan
+function handleGroupBackgroundChange() {
+    const file = document.getElementById('group-bg-input').files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const chatBox = document.getElementById('chat-box');
+            chatBox.style.backgroundImage = `url(${e.target.result})`;
+            chatBox.style.backgroundSize = 'cover';
+            chatBox.style.backgroundPosition = 'center';
+            chatBox.style.backgroundRepeat = 'no-repeat';
+            
+            // Sauvegarder dans localStorage
+            localStorage.setItem('groupBackground', e.target.result);
+            
+            alert("Arrière-plan du groupe changé avec succès !");
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function handleInboxBackgroundChange() {
+    const file = document.getElementById('inbox-bg-input').files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const inboxList = document.getElementById('inbox-list');
+            inboxList.style.backgroundImage = `url(${e.target.result})`;
+            inboxList.style.backgroundSize = 'cover';
+            inboxList.style.backgroundPosition = 'center';
+            inboxList.style.backgroundRepeat = 'no-repeat';
+            
+            // Sauvegarder dans localStorage
+            localStorage.setItem('inboxBackground', e.target.result);
+            
+            alert("Arrière-plan de la page inbox changé avec succès !");
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function handleMembersBackgroundChange() {
+    const file = document.getElementById('members-bg-input').files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const membersList = document.getElementById('members-list');
+            membersList.style.backgroundImage = `url(${e.target.result})`;
+            membersList.style.backgroundSize = 'cover';
+            membersList.style.backgroundPosition = 'center';
+            membersList.style.backgroundRepeat = 'no-repeat';
+            
+            // Sauvegarder dans localStorage
+            localStorage.setItem('membersBackground', e.target.result);
+            
+            alert("Arrière-plan de la page liste des membres changé avec succès !");
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+// Fonction pour restaurer les arrière-plans et synchroniser le verrouillage au chargement
+async function restoreBackgrounds() {
+    // Restaurer l'arrière-plan du groupe
+    const groupBg = localStorage.getItem('groupBackground');
+    if (groupBg) {
+        const chatBox = document.getElementById('chat-box');
+        if (chatBox) {
+            chatBox.style.backgroundImage = `url(${groupBg})`;
+            chatBox.style.backgroundSize = 'cover';
+            chatBox.style.backgroundPosition = 'center';
+            chatBox.style.backgroundRepeat = 'no-repeat';
+        }
+    }
+    
+    // Restaurer l'arrière-plan de l'inbox
+    const inboxBg = localStorage.getItem('inboxBackground');
+    if (inboxBg) {
+        const inboxList = document.getElementById('inbox-list');
+        if (inboxList) {
+            inboxList.style.backgroundImage = `url(${inboxBg})`;
+            inboxList.style.backgroundSize = 'cover';
+            inboxList.style.backgroundPosition = 'center';
+            inboxList.style.backgroundRepeat = 'no-repeat';
+        }
+    }
+    
+    // Restaurer l'arrière-plan des membres
+    const membersBg = localStorage.getItem('membersBackground');
+    if (membersBg) {
+        const membersList = document.getElementById('members-list');
+        if (membersList) {
+            membersList.style.backgroundImage = `url(${membersBg})`;
+            membersList.style.backgroundSize = 'cover';
+            membersList.style.backgroundPosition = 'center';
+            membersList.style.backgroundRepeat = 'no-repeat';
+        }
+    }
+    
+    // Synchroniser l'état de verrouillage du groupe depuis Supabase (sécurisé)
+    await syncLockButtonUI();
+}
+
+// Fonction pour synchroniser périodiquement l'état du verrouillage (toutes les 30 secondes)
+function startPeriodicSync() {
+    setInterval(async () => {
+        try {
+            await syncLockButtonUI();
+            console.log('🔄 Synchronisation périodique du verrouillage effectuée');
+        } catch (err) {
+            console.error('Erreur synchronisation périodique:', err);
+        }
+    }, 30000); // 30 secondes
+}
+
+// Modifier la fonction handleSend pour vérifier le verrouillage côté serveur
+const originalHandleSend = handleSend;
+handleSend = async function() {
+    // Vérifier si l'utilisateur est admin
+    const isAdmin = currentProfile && (currentProfile.is_admin || ADMINS_PHONES.includes(currentProfile.phone));
+    
+    // Si ce n'est pas un admin, vérifier le verrouillage côté serveur
+    if (!isAdmin) {
+        try {
+            const isLocked = await checkGroupLockStatus();
+            if (isLocked) {
+                showLockPopup();
+                return;
+            }
+        } catch (err) {
+            console.error('Erreur vérification verrouillage:', err);
+            // En cas d'erreur, on bloque par sécurité
+            showLockPopup();
+            return;
+        }
+    }
+    
+    // Appeler la fonction originale
+    return originalHandleSend.apply(this, arguments);
+};
+
+// Modifier la fonction handleFileSelect pour vérifier le verrouillage côté serveur
+const originalHandleFileSelect = handleFileSelect;
+handleFileSelect = async function() {
+    // Vérifier si l'utilisateur est admin
+    const isAdmin = currentProfile && (currentProfile.is_admin || ADMINS_PHONES.includes(currentProfile.phone));
+    
+    // Si ce n'est pas un admin, vérifier le verrouillage côté serveur
+    if (!isAdmin) {
+        try {
+            const isLocked = await checkGroupLockStatus();
+            if (isLocked) {
+                showLockPopup();
+                return;
+            }
+        } catch (err) {
+            console.error('Erreur vérification verrouillage:', err);
+            // En cas d'erreur, on bloque par sécurité
+            showLockPopup();
+            return;
+        }
+    }
+    
+    // Appeler la fonction originale
+    return originalHandleFileSelect.apply(this, arguments);
+};
+
 // 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
 // C'est cette ligne qui empêche le retour forcé au login lors d'un rafraîchissement !
 window.onload = function() {
@@ -2506,4 +2819,10 @@ window.onload = function() {
     console.log('=== FIN DIAGNOSTIC ===');
     
     checkSession();
+    
+    // Restaurer les arrière-plans après le chargement
+    setTimeout(restoreBackgrounds, 1000);
+    
+    // Démarrer la synchronisation périodique pour éviter les conflits client/serveur
+    setTimeout(startPeriodicSync, 2000);
 };
