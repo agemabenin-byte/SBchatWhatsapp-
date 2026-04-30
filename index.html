@@ -78,10 +78,10 @@
             </div>
             <div id="adminDropdown" class="dropdown-content">
                 <button onclick="showView('page-members')">👥 Liste des membres</button>
-                <button onclick="showView('page-broadcast')">📢 Diffusion à tous</button>
+                <button onclick="showView('page-broadcast')" id="broadcast-btn" style="display:none;">📢 Diffusion à tous</button>
                 <button onclick="showMessageTemplates()" id="templates-btn" style="display:none;">📋 Modèles Messages - Catalogues</button>
                 <button onclick="showView('page-settings')" id="settings-btn" style="display:none;">⚙️ Paramètres</button>
-                <button onclick="exporterContacts()">📥 Exporter EXCEL (XLS)</button>
+                <button onclick="exporterContacts()" id="export-btn" style="display:none;">📥 Exporter EXCEL (XLS)</button>
                 <button onclick="showView('page-about')">ℹ️ À propos</button>
                 <button onclick="handleLogout()" style="color:red;">🚪 Déconnexion</button>
             </div>
