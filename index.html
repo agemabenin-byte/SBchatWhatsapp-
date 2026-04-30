@@ -80,7 +80,9 @@
                 <button onclick="showView('page-members')">👥 Liste des membres</button>
                 <button onclick="showView('page-broadcast')">📢 Diffusion à tous</button>
                 <button onclick="showMessageTemplates()" id="templates-btn" style="display:none;">📋 Modèles Messages - Catalogues</button>
+                <button onclick="showView('page-settings')" id="settings-btn" style="display:none;">⚙️ Paramètres</button>
                 <button onclick="exporterContacts()">📥 Exporter EXCEL (XLS)</button>
+                <button onclick="showView('page-about')">ℹ️ À propos</button>
                 <button onclick="handleLogout()" style="color:red;">🚪 Déconnexion</button>
             </div>
         </div>
@@ -199,6 +201,89 @@
         </div>
     </div>
 
+    <!-- PAGE À PROPOS -->
+    <div id="page-about" class="page" style="display:none;">
+        <div class="header">
+            <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
+            <div style="flex:1; display:flex; justify-content:center; align-items:center; padding:0 60px;">
+                <b>À propos</b>
+            </div>
+        </div>
+        <div style="padding:20px; text-align:center; background:white; margin:20px; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+            <h3 style="color:#25D366; margin-bottom:20px;">SuccesBonheur WhatsApp Pro</h3>
+            <p style="color:#333; line-height:1.6; margin-bottom:15px;">
+                Cette application est développée par <strong>AGEMA Technologie</strong>.
+            </p>
+            <p style="color:#666; font-size:12px; margin-bottom:20px;">
+                (c) Tous droits réservés : Toute reproduction partielle ou intégrale est strictement interdite.
+            </p>
+            <div style="border-top:1px solid #eee; padding-top:20px;">
+                <p style="margin-bottom:10px;">
+                    📧 <a href="mailto:Agemabenin@Gmail.com" style="color:#25D366; text-decoration:none;">Agemabenin@Gmail.com</a>
+                </p>
+                <p style="margin-bottom:5px;">
+                    📱 <a href="tel:+2290140804495" style="color:#25D366; text-decoration:none;">+229 01 40 80 44 95</a>
+                </p>
+                <p style="margin-bottom:5px;">
+                    📱 <a href="tel:+2290196479181" style="color:#25D366; text-decoration:none;">+229 01 96 47 91 81</a>
+                </p>
+                <p>
+                    📱 <a href="tel:+2290195618690" style="color:#25D366; text-decoration:none;">+229 01 95 61 86 90</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAGE PARAMÈTRES -->
+    <div id="page-settings" class="page" style="display:none;">
+        <div class="header">
+            <button onclick="goBack()" style="background:none; border:none; color:white; font-size:20px; position:absolute; left:20px;">⬅</button>
+            <div style="flex:1; display:flex; justify-content:center; align-items:center; padding:0 60px;">
+                <b>Paramètres</b>
+            </div>
+        </div>
+        <div style="padding:20px;">
+            <div style="background:white; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:15px;">
+                <button onclick="toggleGroupLock()" id="lockGroupBtn" style="width:100%; padding:15px; border:none; background:#25D366; color:white; border-radius:10px; font-size:16px; cursor:pointer;">
+                    🔒 Vérouiller le groupe
+                </button>
+            </div>
+            <div style="background:white; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:15px;">
+                <button onclick="changeGroupBackground()" style="width:100%; padding:15px; border:none; background:#075E54; color:white; border-radius:10px; font-size:16px; cursor:pointer;">
+                    🖼️ Changer image d'arrière plan du Groupe
+                </button>
+            </div>
+            <div style="background:white; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-bottom:15px;">
+                <button onclick="changeInboxBackground()" style="width:100%; padding:15px; border:none; background:#075E54; color:white; border-radius:10px; font-size:16px; cursor:pointer;">
+                    📨 Changer image d'arrière plan de la page inbox
+                </button>
+            </div>
+            <div style="background:white; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                <button onclick="changeMembersBackground()" style="width:100%; padding:15px; border:none; background:#075E54; color:white; border-radius:10px; font-size:16px; cursor:pointer;">
+                    👥 Changer image d'arrière plan de la page Liste des membres
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Popup pour groupe verrouillé -->
+    <div id="lockPopup" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;">
+        <div style="background:white; padding:30px; border-radius:15px; text-align:center; max-width:300px; margin:20px;">
+            <h3 style="color:#25D366; margin-bottom:15px;">⏳ Groupe vérouillé</h3>
+            <p style="color:#333; line-height:1.5; margin-bottom:20px;">
+                Le groupe est temporairement vérouillé. Veuillez essayer dans quelques minutes.<br><br>
+                Vous pouvez toujours envoyer des MESSAGES INBOX aux autres membres, à partir du Menu Liste des membres. Merci.
+            </p>
+            <button onclick="closeLockPopup()" style="background:#25D366; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;">
+                OK
+            </button>
+        </div>
+    </div>
+
+    <!-- Input caché pour les images d'arrière-plan -->
+    <input type="file" id="group-bg-input" accept="image/*" style="display:none;" onchange="handleGroupBackgroundChange()">
+    <input type="file" id="inbox-bg-input" accept="image/*" style="display:none;" onchange="handleInboxBackgroundChange()">
+    <input type="file" id="members-bg-input" accept="image/*" style="display:none;" onchange="handleMembersBackgroundChange()">
 
     <script src="script.js" defer></script>
 </body>
