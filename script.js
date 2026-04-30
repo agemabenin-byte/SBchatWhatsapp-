@@ -281,6 +281,8 @@ async function handleSend() {
     clearEditor('msgInput'); fileInput.value = ""; cancelReply();
 }
 
+
+
 // Cette fonction gère tes boutons "Retour" (la flèche ⬅ dans ton HTML)
 function goBack() {
     window.history.back(); // Cela va déclencher l'événement 'popstate' juste en dessous
@@ -472,12 +474,8 @@ async function loadInbox() {
                 deleteIcon = `<span onclick="supprimerMessageInbox('${msg.id}', '${msg.image_url || ''}', '${msg.media_public_id || ''}', '${msg.sender_phone}')" style="cursor:pointer; color:red; margin-left:8px; font-size:12px;">🗑️</span>`;
             }
             
-            // Icône de partage - tout le monde peut partager les messages des admins
-            if (senderIsAdmin) {
-                const contentEncoded = encodeURIComponent(msg.content || '');
-                shareIcon = `<span onclick="shareMessageInbox('${msg.id}', '${msg.sender_phone}', '${contentEncoded}', '${msg.image_url || ''}')" style="cursor:pointer; color:blue; margin-left:8px; font-size:12px;">⤴️</span>`;
-            } else if (currentUserIsAdmin) {
-                // Admin peut aussi partager les messages des non-admins
+            if (currentUserIsAdmin) {
+                // Encoder le contenu pour éviter les problèmes avec les URLs et caractères spéciaux
                 const contentEncoded = encodeURIComponent(msg.content || '');
                 shareIcon = `<span onclick="shareMessageInbox('${msg.id}', '${msg.sender_phone}', '${contentEncoded}', '${msg.image_url || ''}')" style="cursor:pointer; color:blue; margin-left:8px; font-size:12px;">⤴️</span>`;
             }
@@ -669,16 +667,10 @@ async function loadMembers() {
                 statusInfo = '<span style="color:red;">🚫 Banni</span>';
             }
             
-            // Icône de blocage pour les non-admins (bloquer d'autres non-admins)
+            // Icône de blocage pour les admins (uniquement pour les non-admins)
             let blockIcon = "";
-            if (!m.is_admin && !m.is_banned) {
-                if (currentUserIsAdmin) {
-                    // Admin peut bloquer n'importe quel non-admin
-                    blockIcon = `<span onclick="bloquerUtilisateur('${m.id}', '${m.phone}')" style="cursor:pointer; color:red; margin-right:5px; font-size:12px;">🚫</span>`;
-                } else if (m.id !== currentUser.id) {
-                    // Non-admin peut bloquer un autre non-admin (mais pas lui-même)
-                    blockIcon = `<span onclick="bloquerUtilisateur('${m.id}', '${m.phone}')" style="cursor:pointer; color:red; margin-right:5px; font-size:12px;">🚫</span>`;
-                }
+            if (currentUserIsAdmin && !m.is_admin && !m.is_banned) {
+                blockIcon = `<span onclick="bloquerUtilisateur('${m.id}', '${m.phone}')" style="cursor:pointer; color:orange; margin-right:5px; font-size:12px;">🚫</span>`;
             }
             
             // Boutons d'action pour les admins
@@ -2410,37 +2402,42 @@ async function supprimerMessageInbox(messageId, imageUrl, mediaPublicId, senderP
 }
 
 function gererAffichageAdmin(userPhone) {
-    // Vérifier si l'utilisateur est admin via le champ is_admin
-    const isAdmin = currentProfile && currentProfile.is_admin;
+    const isAdmin = ADMINS_PHONES.includes(userPhone);
+    
+    // Afficher/masquer tous les menus admin
+    const settingsBtn = document.getElementById('settings-btn');
+    const broadcastBtn = document.getElementById('broadcast-btn');
+    const exportBtn = document.getElementById('export-btn');
+    const templatesBtn = document.getElementById('templates-btn');
+    
+    // Afficher/masquer les trombones pour les admins
+    const attachGroup = document.getElementById('admin-attach-btn');
+    const attachBC = document.getElementById('admin-bc-attach');
+    const attachInbox = document.getElementById('admin-inbox-attach');
     
     if (isAdmin) {
-        // On affiche les trombones pour l'admin
-        const attachGroup = document.getElementById('admin-attach-btn');
-        const attachBC = document.getElementById('admin-bc-attach');
-        const attachInbox = document.getElementById('admin-inbox-attach');
-        const menuBtn = document.getElementById('adminMenuBtn');
-        const templatesBtn = document.getElementById('templates-btn');
-
+        if (settingsBtn) settingsBtn.style.display = 'block';
+        if (broadcastBtn) broadcastBtn.style.display = 'block';
+        if (exportBtn) exportBtn.style.display = 'block';
+        if (templatesBtn) templatesBtn.style.display = 'block';
+        
+        // Afficher les trombones pour l'admin
         if (attachGroup) attachGroup.style.display = 'inline-block';
         if (attachBC) attachBC.style.display = 'inline-block';
         if (attachInbox) attachInbox.style.display = 'inline-block';
-        if (menuBtn) menuBtn.style.display = 'block'; // S'assure que le menu ⋮ est visible
-        if (templatesBtn) templatesBtn.style.display = 'block'; // Afficher le bouton Modèles
     } else {
-        // Cacher les boutons admin pour les non-admins
-        const attachGroup = document.getElementById('admin-attach-btn');
-        const attachBC = document.getElementById('admin-bc-attach');
-        const attachInbox = document.getElementById('admin-inbox-attach');
-        const broadcastBtn = document.querySelector('button[onclick="showView(\'page-broadcast\')"]');
-        const exportBtn = document.querySelector('button[onclick="exporterContacts()"]');
-
+        if (settingsBtn) settingsBtn.style.display = 'none';
+        if (broadcastBtn) broadcastBtn.style.display = 'none';
+        if (exportBtn) exportBtn.style.display = 'none';
+        if (templatesBtn) templatesBtn.style.display = 'none';
+        
+        // Cacher les trombones pour les non-admins
         if (attachGroup) attachGroup.style.display = 'none';
         if (attachBC) attachBC.style.display = 'none';
         if (attachInbox) attachInbox.style.display = 'none';
-        if (broadcastBtn) broadcastBtn.style.display = 'none';
-        if (exportBtn) exportBtn.style.display = 'none';
     }
 }
+
 
 async function handleAdminFileSelect() {
     const fileInput = document.getElementById('video-file-input');
@@ -2480,8 +2477,9 @@ async function handleAdminFileSelect() {
         if (xhr.status === 200) {
             const data = JSON.parse(xhr.responseText);
             if (data.secure_url) {
-                // Stocker l'URL dans window.templateMediaUrl pour que handleSend() l'utilise
-                window.templateMediaUrl = data.secure_url;
+                // On met l'URL dans le champ de saisie
+                const input = document.getElementById('msgInput');
+                input.value = (input.value ? input.value + "\n" : "") + data.secure_url;
                 
                 // On envoie direct dans le chat
                 await handleSend(); 
@@ -2503,6 +2501,19 @@ async function handleAdminFileSelect() {
     xhr.open("POST", `https://api.cloudinary.com/v1_1/dn3vf0mhm/${resourceType}/upload`);
     xhr.send(formData);
 }
+
+// 3. LE DÉCLENCHEUR AUTOMATIQUE (À mettre tout en bas du fichier)
+// C'est cette ligne qui empêche le retour forcé au login lors d'un rafraîchissement !
+window.onload = function() {
+    console.log('=== DIAGNOSTIC DE CHARGEMENT ===');
+    console.log('togglePass disponible:', typeof togglePass);
+    console.log('toggleAuthMode disponible:', typeof toggleAuthMode);
+    console.log('handleLoginAction disponible:', typeof handleLoginAction);
+    console.log('handleRegisterAction disponible:', typeof handleRegisterAction);
+    console.log('=== FIN DIAGNOSTIC ===');
+    
+    checkSession();
+};
 
 // Définition de la fonction de gestion des médias pour la diffusion (appelée dès qu'on choisit un fichier).
 // Nouvelle version harmonisée pour la diffusion
