@@ -2500,13 +2500,26 @@ async function handleAdminFileSelect() {
 // Variable globale pour l'état de verrouillage du groupe (sera synchronisée avec Supabase)
 let isGroupLocked = false;
 
-// Fonction pour afficher/masquer le bouton paramètres selon le rôle
+// Fonction pour afficher/masquer les menus administrateurs selon le rôle
 function gererAffichageAdmin(phone) {
     const isAdmin = ADMINS_PHONES.includes(phone);
-    const settingsBtn = document.getElementById('settings-btn');
     
-    if (isAdmin && settingsBtn) {
-        settingsBtn.style.display = 'block';
+    // Afficher/masquer tous les menus admin
+    const settingsBtn = document.getElementById('settings-btn');
+    const broadcastBtn = document.getElementById('broadcast-btn');
+    const exportBtn = document.getElementById('export-btn');
+    const templatesBtn = document.getElementById('templates-btn');
+    
+    if (isAdmin) {
+        if (settingsBtn) settingsBtn.style.display = 'block';
+        if (broadcastBtn) broadcastBtn.style.display = 'block';
+        if (exportBtn) exportBtn.style.display = 'block';
+        if (templatesBtn) templatesBtn.style.display = 'block';
+    } else {
+        if (settingsBtn) settingsBtn.style.display = 'none';
+        if (broadcastBtn) broadcastBtn.style.display = 'none';
+        if (exportBtn) exportBtn.style.display = 'none';
+        if (templatesBtn) templatesBtn.style.display = 'none';
     }
 }
 
