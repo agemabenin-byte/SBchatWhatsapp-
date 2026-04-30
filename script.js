@@ -2654,104 +2654,274 @@ function changeMembersBackground() {
     document.getElementById('members-bg-input').click();
 }
 
-// Fonctions pour gérer le changement d'arrière-plan
-function handleGroupBackgroundChange() {
+// Fonction pour restaurer les arrière-plans par défaut
+async function restoreDefaultBackgrounds() {
+    // Vérifier si l'utilisateur est admin
+    if (!currentProfile || !currentProfile.is_admin && !ADMINS_PHONES.includes(currentProfile.phone)) {
+        alert("Seuls les administrateurs peuvent restaurer les arrière-plans.");
+        return;
+    }
+    
+    if (!confirm("Voulez-vous vraiment restaurer les arrière-plans par défaut de WhatsApp ? Tous les arrière-plans personnalisés seront supprimés.")) {
+        return;
+    }
+    
+    try {
+        // Mettre à jour Supabase pour supprimer tous les arrière-plans (mettre à NULL)
+        const { error } = await _supabase
+            .from('app_settings')
+            .update({ 
+                group_background: null,
+                inbox_background: null,
+                members_background: null
+            })
+            .eq('id', 1);
+            
+        if (error) throw error;
+        
+        // Supprimer les arrière-plans locaux
+        localStorage.removeItem('groupBackground');
+        localStorage.removeItem('inboxBackground');
+        localStorage.removeItem('membersBackground');
+        
+        // Appliquer les styles par défaut (supprimer les arrière-plans)
+        const chatBox = document.getElementById('chat-box');
+        const inboxList = document.getElementById('inbox-list');
+        const membersList = document.getElementById('members-list');
+        
+        if (chatBox) {
+            chatBox.style.backgroundImage = '';
+            chatBox.style.backgroundColor = '#efeae2'; // Couleur par défaut du body
+        }
+        
+        if (inboxList) {
+            inboxList.style.backgroundImage = '';
+            inboxList.style.backgroundColor = '';
+        }
+        
+        if (membersList) {
+            membersList.style.backgroundImage = '';
+            membersList.style.backgroundColor = '';
+        }
+        
+        alert("Arrière-plans restaurés avec succès pour tous les utilisateurs !");
+        
+    } catch (err) {
+        console.error('Erreur restauration arrière-plans:', err);
+        alert("Erreur lors de la restauration des arrière-plans.");
+    }
+}
+
+// Fonctions pour gérer le changement d'arrière-plan (stockage serveur)
+async function handleGroupBackgroundChange() {
     const file = document.getElementById('group-bg-input').files[0];
     if (file) {
         const reader = new FileReader();
-        reader.onload = function(e) {
-            const chatBox = document.getElementById('chat-box');
-            chatBox.style.backgroundImage = `url(${e.target.result})`;
-            chatBox.style.backgroundSize = 'cover';
-            chatBox.style.backgroundPosition = 'center';
-            chatBox.style.backgroundRepeat = 'no-repeat';
-            
-            // Sauvegarder dans localStorage
-            localStorage.setItem('groupBackground', e.target.result);
-            
-            alert("Arrière-plan du groupe changé avec succès !");
+        reader.onload = async function(e) {
+            try {
+                // Upload vers Cloudinary pour stockage serveur
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', "chat_preset");
+                
+                const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
+                    method: 'POST', 
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (!data.secure_url) throw new Error("Upload échoué");
+                
+                const imageUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+                
+                // Sauvegarder dans Supabase pour tous les utilisateurs
+                const { error } = await _supabase
+                    .from('app_settings')
+                    .update({ group_background: imageUrl })
+                    .eq('id', 1);
+                    
+                if (error) throw error;
+                
+                // Appliquer immédiatement
+                const chatBox = document.getElementById('chat-box');
+                chatBox.style.backgroundImage = `url(${imageUrl})`;
+                chatBox.style.backgroundSize = 'cover';
+                chatBox.style.backgroundPosition = 'center';
+                chatBox.style.backgroundRepeat = 'no-repeat';
+                
+                alert("Arrière-plan du groupe changé pour tous les utilisateurs !");
+                
+            } catch (err) {
+                console.error('Erreur changement arrière-plan groupe:', err);
+                alert("Erreur lors du changement d'arrière-plan.");
+            }
         };
         reader.readAsDataURL(file);
     }
 }
 
-function handleInboxBackgroundChange() {
+async function handleInboxBackgroundChange() {
     const file = document.getElementById('inbox-bg-input').files[0];
     if (file) {
         const reader = new FileReader();
-        reader.onload = function(e) {
-            const inboxList = document.getElementById('inbox-list');
-            inboxList.style.backgroundImage = `url(${e.target.result})`;
-            inboxList.style.backgroundSize = 'cover';
-            inboxList.style.backgroundPosition = 'center';
-            inboxList.style.backgroundRepeat = 'no-repeat';
-            
-            // Sauvegarder dans localStorage
-            localStorage.setItem('inboxBackground', e.target.result);
-            
-            alert("Arrière-plan de la page inbox changé avec succès !");
+        reader.onload = async function(e) {
+            try {
+                // Upload vers Cloudinary pour stockage serveur
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', "chat_preset");
+                
+                const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
+                    method: 'POST', 
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (!data.secure_url) throw new Error("Upload échoué");
+                
+                const imageUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+                
+                // Sauvegarder dans Supabase pour tous les utilisateurs
+                const { error } = await _supabase
+                    .from('app_settings')
+                    .update({ inbox_background: imageUrl })
+                    .eq('id', 1);
+                    
+                if (error) throw error;
+                
+                // Appliquer immédiatement
+                const inboxList = document.getElementById('inbox-list');
+                inboxList.style.backgroundImage = `url(${imageUrl})`;
+                inboxList.style.backgroundSize = 'cover';
+                inboxList.style.backgroundPosition = 'center';
+                inboxList.style.backgroundRepeat = 'no-repeat';
+                
+                alert("Arrière-plan de la page inbox changé pour tous les utilisateurs !");
+                
+            } catch (err) {
+                console.error('Erreur changement arrière-plan inbox:', err);
+                alert("Erreur lors du changement d'arrière-plan.");
+            }
         };
         reader.readAsDataURL(file);
     }
 }
 
-function handleMembersBackgroundChange() {
+async function handleMembersBackgroundChange() {
     const file = document.getElementById('members-bg-input').files[0];
     if (file) {
         const reader = new FileReader();
-        reader.onload = function(e) {
-            const membersList = document.getElementById('members-list');
-            membersList.style.backgroundImage = `url(${e.target.result})`;
-            membersList.style.backgroundSize = 'cover';
-            membersList.style.backgroundPosition = 'center';
-            membersList.style.backgroundRepeat = 'no-repeat';
-            
-            // Sauvegarder dans localStorage
-            localStorage.setItem('membersBackground', e.target.result);
-            
-            alert("Arrière-plan de la page liste des membres changé avec succès !");
+        reader.onload = async function(e) {
+            try {
+                // Upload vers Cloudinary pour stockage serveur
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', "chat_preset");
+                
+                const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
+                    method: 'POST', 
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (!data.secure_url) throw new Error("Upload échoué");
+                
+                const imageUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+                
+                // Sauvegarder dans Supabase pour tous les utilisateurs
+                const { error } = await _supabase
+                    .from('app_settings')
+                    .update({ members_background: imageUrl })
+                    .eq('id', 1);
+                    
+                if (error) throw error;
+                
+                // Appliquer immédiatement
+                const membersList = document.getElementById('members-list');
+                membersList.style.backgroundImage = `url(${imageUrl})`;
+                membersList.style.backgroundSize = 'cover';
+                membersList.style.backgroundPosition = 'center';
+                membersList.style.backgroundRepeat = 'no-repeat';
+                
+                alert("Arrière-plan de la page liste des membres changé pour tous les utilisateurs !");
+                
+            } catch (err) {
+                console.error('Erreur changement arrière-plan membres:', err);
+                alert("Erreur lors du changement d'arrière-plan.");
+            }
         };
         reader.readAsDataURL(file);
+    }
+}
+
+// Fonction pour charger les arrière-plans depuis Supabase pour tous les utilisateurs
+async function loadBackgroundsFromServer() {
+    try {
+        const { data, error } = await _supabase
+            .from('app_settings')
+            .select('group_background, inbox_background, members_background')
+            .eq('id', 1)
+            .single();
+            
+        if (error) {
+            // Si la table n'existe pas encore, on la crée
+            if (error.code === 'PGRST116') {
+                await _supabase.from('app_settings').insert([{
+                    id: 1,
+                    is_group_locked: false,
+                    group_background: null,
+                    inbox_background: null,
+                    members_background: null
+                }]);
+                return;
+            }
+            console.error('Erreur chargement arrière-plans:', error);
+            return;
+        }
+        
+        if (data) {
+            // Appliquer l'arrière-plan du groupe
+            if (data.group_background) {
+                const chatBox = document.getElementById('chat-box');
+                if (chatBox) {
+                    chatBox.style.backgroundImage = `url(${data.group_background})`;
+                    chatBox.style.backgroundSize = 'cover';
+                    chatBox.style.backgroundPosition = 'center';
+                    chatBox.style.backgroundRepeat = 'no-repeat';
+                }
+            }
+            
+            // Appliquer l'arrière-plan de l'inbox
+            if (data.inbox_background) {
+                const inboxList = document.getElementById('inbox-list');
+                if (inboxList) {
+                    inboxList.style.backgroundImage = `url(${data.inbox_background})`;
+                    inboxList.style.backgroundSize = 'cover';
+                    inboxList.style.backgroundPosition = 'center';
+                    inboxList.style.backgroundRepeat = 'no-repeat';
+                }
+            }
+            
+            // Appliquer l'arrière-plan des membres
+            if (data.members_background) {
+                const membersList = document.getElementById('members-list');
+                if (membersList) {
+                    membersList.style.backgroundImage = `url(${data.members_background})`;
+                    membersList.style.backgroundSize = 'cover';
+                    membersList.style.backgroundPosition = 'center';
+                    membersList.style.backgroundRepeat = 'no-repeat';
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Erreur loadBackgroundsFromServer:', err);
     }
 }
 
 // Fonction pour restaurer les arrière-plans et synchroniser le verrouillage au chargement
 async function restoreBackgrounds() {
-    // Restaurer l'arrière-plan du groupe
-    const groupBg = localStorage.getItem('groupBackground');
-    if (groupBg) {
-        const chatBox = document.getElementById('chat-box');
-        if (chatBox) {
-            chatBox.style.backgroundImage = `url(${groupBg})`;
-            chatBox.style.backgroundSize = 'cover';
-            chatBox.style.backgroundPosition = 'center';
-            chatBox.style.backgroundRepeat = 'no-repeat';
-        }
-    }
-    
-    // Restaurer l'arrière-plan de l'inbox
-    const inboxBg = localStorage.getItem('inboxBackground');
-    if (inboxBg) {
-        const inboxList = document.getElementById('inbox-list');
-        if (inboxList) {
-            inboxList.style.backgroundImage = `url(${inboxBg})`;
-            inboxList.style.backgroundSize = 'cover';
-            inboxList.style.backgroundPosition = 'center';
-            inboxList.style.backgroundRepeat = 'no-repeat';
-        }
-    }
-    
-    // Restaurer l'arrière-plan des membres
-    const membersBg = localStorage.getItem('membersBackground');
-    if (membersBg) {
-        const membersList = document.getElementById('members-list');
-        if (membersList) {
-            membersList.style.backgroundImage = `url(${membersBg})`;
-            membersList.style.backgroundSize = 'cover';
-            membersList.style.backgroundPosition = 'center';
-            membersList.style.backgroundRepeat = 'no-repeat';
-        }
-    }
+    // Charger les arrière-plans depuis le serveur (pour tous les utilisateurs)
+    await loadBackgroundsFromServer();
     
     // Synchroniser l'état de verrouillage du groupe depuis Supabase (sécurisé)
     await syncLockButtonUI();
