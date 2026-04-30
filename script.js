@@ -2400,35 +2400,39 @@ async function supprimerMessageInbox(messageId, imageUrl, mediaPublicId, senderP
 }
 
 function gererAffichageAdmin(userPhone) {
-    // Vérifier si l'utilisateur est admin via le champ is_admin
-    const isAdmin = currentProfile && currentProfile.is_admin;
+    const isAdmin = ADMINS_PHONES.includes(userPhone);
+    
+    // Afficher/masquer tous les menus admin
+    const settingsBtn = document.getElementById('settings-btn');
+    const broadcastBtn = document.getElementById('broadcast-btn');
+    const exportBtn = document.getElementById('export-btn');
+    const templatesBtn = document.getElementById('templates-btn');
+    
+    // Afficher/masquer les trombones pour les admins
+    const attachGroup = document.getElementById('admin-attach-btn');
+    const attachBC = document.getElementById('admin-bc-attach');
+    const attachInbox = document.getElementById('admin-inbox-attach');
     
     if (isAdmin) {
-        // On affiche les trombones pour l'admin
-        const attachGroup = document.getElementById('admin-attach-btn');
-        const attachBC = document.getElementById('admin-bc-attach');
-        const attachInbox = document.getElementById('admin-inbox-attach');
-        const menuBtn = document.getElementById('adminMenuBtn');
-        const templatesBtn = document.getElementById('templates-btn');
-
+        if (settingsBtn) settingsBtn.style.display = 'block';
+        if (broadcastBtn) broadcastBtn.style.display = 'block';
+        if (exportBtn) exportBtn.style.display = 'block';
+        if (templatesBtn) templatesBtn.style.display = 'block';
+        
+        // Afficher les trombones pour l'admin
         if (attachGroup) attachGroup.style.display = 'inline-block';
         if (attachBC) attachBC.style.display = 'inline-block';
         if (attachInbox) attachInbox.style.display = 'inline-block';
-        if (menuBtn) menuBtn.style.display = 'block'; // S'assure que le menu ⋮ est visible
-        if (templatesBtn) templatesBtn.style.display = 'block'; // Afficher le bouton Modèles
     } else {
-        // Cacher les boutons admin pour les non-admins
-        const attachGroup = document.getElementById('admin-attach-btn');
-        const attachBC = document.getElementById('admin-bc-attach');
-        const attachInbox = document.getElementById('admin-inbox-attach');
-        const broadcastBtn = document.querySelector('button[onclick="showView(\'page-broadcast\')"]');
-        const exportBtn = document.querySelector('button[onclick="exporterContacts()"]');
-
+        if (settingsBtn) settingsBtn.style.display = 'none';
+        if (broadcastBtn) broadcastBtn.style.display = 'none';
+        if (exportBtn) exportBtn.style.display = 'none';
+        if (templatesBtn) templatesBtn.style.display = 'none';
+        
+        // Cacher les trombones pour les non-admins
         if (attachGroup) attachGroup.style.display = 'none';
         if (attachBC) attachBC.style.display = 'none';
         if (attachInbox) attachInbox.style.display = 'none';
-        if (broadcastBtn) broadcastBtn.style.display = 'none';
-        if (exportBtn) exportBtn.style.display = 'none';
     }
 }
 
@@ -2495,33 +2499,182 @@ async function handleAdminFileSelect() {
     xhr.send(formData);
 }
 
+// Définition de la fonction de gestion des médias pour la diffusion (appelée dès qu'on choisit un fichier).
+// Nouvelle version harmonisée pour la diffusion
+async function handleBroadcastMedia(type) {
+    // 1. Sélection de l'input selon le type (image ou vidéo)
+    const inputId = type === 'image' ? 'bc-photo-input' : 'bc-video-input';
+    const file = document.getElementById(inputId).files[0];
+    if (!file) return;
+
+    // 2. Préparation visuelle de la barre de progression
+    const progressContainer = document.getElementById('upload-progress-container');
+    const progressBar = document.getElementById('upload-progress-bar');
+    const progressText = document.getElementById('upload-progress-text');
+    
+    progressContainer.style.display = 'flex';
+    progressBar.style.width = '0%';
+    progressText.innerText = '0%';
+
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // 3. Suivi de la progression de l'upload
+    xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = percent + '%';
+            progressText.innerText = `Téléchargement : ${percent}%`;
+        }
+    });
+
+    // 4. Une fois l'upload terminé sur Cloudinary
+    xhr.addEventListener("load", async () => {
+        progressContainer.style.display = 'none';
+        if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
+            if (data.secure_url) {
+                // --- ACTION CRUCIALE ---
+                // On stocke l'URL optimisée dans une variable globale que executeBroadcast pourra lire
+                const optimizedUrl = type === 'image' ? 
+                    data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/') : 
+                    data.secure_url;
+                window.templateMediaUrl = optimizedUrl;
+                
+                // Optionnel : On affiche un petit indicateur visuel ou on met l'URL dans le texte
+                const broadcastInput = document.getElementById('broadcast-msg');
+                broadcastInput.innerText += "\nFichier joint"; 
+                
+                console.log("Média prêt pour la diffusion :", window.templateMediaUrl);
+            }
+        } else {
+            alert("Erreur lors du chargement du média.");
+        }
+    });
+
+    // 5. Choix du compte Cloudinary (dtkssnhub pour images, dn3vf0mhm pour vidéos)
+    if (type === 'image') {
+        formData.append('upload_preset', "chat_preset");
+        xhr.open("POST", `https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`);
+    } else {
+        formData.append('upload_preset', "video_preset");
+        const resourceType = file.type.startsWith('video/') ? "video" : "raw";
+        xhr.open("POST", `https://api.cloudinary.com/v1_1/dn3vf0mhm/${resourceType}/upload`);
+    }
+    xhr.send(formData);
+}
+
+// Définition de la fonction asynchrone qui gère l'envoi de médias pour la messagerie privée (Inbox).
+// Le paramètre 'type' permet de savoir si l'utilisateur envoie une photo ou une vidéo.
+async function handleInboxMedia(type) {
+    
+    // Cette ligne utilise une condition "ternaire" pour choisir le bon ID HTML à cibler.
+    // Si type est 'image', on prend l'ID de l'input photo, sinon on prend l'ID de l'input vidéo.
+    const inputId = type === 'image' ? 'inbox-photo-input' : 'inbox-video-input';
+    
+    // On accède à l'élément HTML choisi et on récupère le premier fichier (index 0) de sa liste.
+    // C'est le fichier que l'utilisateur vient de sélectionner sur son téléphone ou PC.
+    const file = document.getElementById(inputId).files[0];
+    
+    // Sécurité : si l'utilisateur a ouvert le sélecteur de fichiers puis a cliqué sur "Annuler" 
+    // sans rien choisir, 'file' sera vide. Dans ce cas, on arrête tout avec 'return'.
+    if (!file) return;
+
+    // --- PRÉPARATION DU VISUEL DE CHARGEMENT ---
+    // On récupère les trois éléments qui composent ta barre de progression.
+    // Le conteneur (la boîte), la barre (la partie colorée) et le texte (le chiffre %).
+    const progressContainer = document.getElementById('upload-progress-container');
+    const progressBar = document.getElementById('upload-progress-bar');
+    const progressText = document.getElementById('upload-progress-text');
+    
+    // Par défaut, ta barre de progression est cachée (display:none).
+    // Cette ligne change le style pour la rendre visible à l'écran dès que l'upload commence.
+    progressContainer.style.display = 'flex';
+
+    // On crée un objet XMLHttpRequest (XHR). C'est l'outil "classique" en JavaScript pour 
+    // envoyer des données vers un serveur web en arrière-plan sans recharger la page.
+    const xhr = new XMLHttpRequest();
+    
+    // On crée un objet FormData. C'est comme un "enveloppe virtuelle" qui permet de 
+    // transporter des fichiers binaires (images, vidéos) comme si c'était un formulaire papier.
+    const formData = new FormData();
+    
+    // On place notre fichier physique à l'intérieur de l'enveloppe sous le nom 'file'.
+    // C'est ce nom que Cloudinary attend pour traiter l'image.
+    formData.append('file', file);
+
+    // --- SURVEILLANCE DU TRANSFERT (PROGRESSION) ---
+    // On ajoute un "écouteur" sur l'upload. Il va se déclencher plusieurs fois par seconde 
+    // pendant que les octets du fichier montent vers internet.
+    xhr.upload.addEventListener("progress", (e) => {
+        // Vérifie si le navigateur est capable de calculer la taille totale (pour éviter les erreurs).
+        if (e.lengthComputable) {
+            // Calcul mathématique : (octets déjà envoyés / octets totaux du fichier) x 100.
+            // On arrondit avec Math.round pour ne pas avoir de chiffres après la virgule.
+            const percent = Math.round((e.loaded / e.total) * 100);
+            
+            // On ajuste la largeur CSS de la barre verte en fonction du pourcentage calculé.
+            progressBar.style.width = percent + '%';
+            
+            // On met à jour le texte à l'intérieur de la barre pour rassurer l'utilisateur (ex: "85%").
+            progressText.innerText = percent + '%';
+        }
+    });
+
+    // --- RÉCEPTION DE LA RÉPONSE (FIN DE L'UPLOAD) ---
+    // Cet écouteur se déclenche quand le serveur Cloudinary a fini de recevoir le fichier.
+    xhr.addEventListener("load", async () => {
+        // Le transfert est fini, on cache immédiatement la barre de progression.
+        progressContainer.style.display = 'none';
+        
+        // Le code de statut "200" signifie que tout s'est passé parfaitement sur le serveur.
+        if (xhr.status === 200) {
+            // La réponse de Cloudinary est une longue chaîne de caractères.
+            // On la transforme en objet JavaScript facile à lire avec JSON.parse.
+            const data = JSON.parse(xhr.responseText);
+            
+            // Si l'objet 'data' contient bien une 'secure_url' (l'adresse web finale du fichier).
+            if (data.secure_url) {
+                // On récupère l'élément HTML de la zone de saisie du message (ton éditeur de texte).
+                const input = document.getElementById('edit-msg');
+                
+                // On ajoute l'URL de l'image à la suite du texte déjà écrit.
+                // (input.value ? ... : "") vérifie s'il y a déjà du texte pour savoir s'il faut 
+                // ajouter un retour à la ligne (\n) avant l'URL pour que ce soit propre.
+                input.value = (input.value ? input.value + "\n" : "") + data.secure_url;
+                
+                // Note pour Gis : À ce stade, l'URL est écrite dans le texte du message.
+                // L'utilisateur doit encore cliquer sur "Envoyer" pour que ce soit enregistré en base de données.
+            }
+        }
+    });
+
+    // --- CONFIGURATION DE LA DESTINATION ---
+    // On choisit vers quel compte Cloudinary envoyer le fichier.
+    if (type === 'image') {
+        // Si c'est une image : on ajoute le 'preset' des images et on vise ton premier compte.
+        formData.append('upload_preset', "chat_preset");
+        xhr.open("POST", `https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`);
+    } else {
+        // Si c'est une vidéo ou un fichier (.zip, .exe, .pdf) : on ajoute le preset vidéo.
+        formData.append('upload_preset', "video_preset");
+        
+        // On vérifie le type de fichier pour dire à Cloudinary si c'est "video" ou "raw" (brut).
+        // C'est important car Cloudinary range les fichiers différemment selon ce type.
+        const resourceType = file.type.startsWith('video/') ? "video" : "raw";
+        xhr.open("POST", `https://api.cloudinary.com/v1_1/dn3vf0mhm/${resourceType}/upload`);
+    }
+    
+    // Cette ligne est le "bouton de départ" : elle envoie réellement l'enveloppe (formData) vers Cloudinary.
+    xhr.send(formData);
+}
+
 // --- FONCTIONNALITÉS PARAMÈTRES ---
 
 // Variable globale pour l'état de verrouillage du groupe (sera synchronisée avec Supabase)
 let isGroupLocked = false;
 
-// Fonction pour afficher/masquer les menus administrateurs selon le rôle
-function gererAffichageAdmin(phone) {
-    const isAdmin = ADMINS_PHONES.includes(phone);
-    
-    // Afficher/masquer tous les menus admin
-    const settingsBtn = document.getElementById('settings-btn');
-    const broadcastBtn = document.getElementById('broadcast-btn');
-    const exportBtn = document.getElementById('export-btn');
-    const templatesBtn = document.getElementById('templates-btn');
-    
-    if (isAdmin) {
-        if (settingsBtn) settingsBtn.style.display = 'block';
-        if (broadcastBtn) broadcastBtn.style.display = 'block';
-        if (exportBtn) exportBtn.style.display = 'block';
-        if (templatesBtn) templatesBtn.style.display = 'block';
-    } else {
-        if (settingsBtn) settingsBtn.style.display = 'none';
-        if (broadcastBtn) broadcastBtn.style.display = 'none';
-        if (exportBtn) exportBtn.style.display = 'none';
-        if (templatesBtn) templatesBtn.style.display = 'none';
-    }
-}
 
 // Fonction pour vérifier l'état de verrouillage depuis Supabase
 async function checkGroupLockStatus() {
