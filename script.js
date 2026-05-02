@@ -2479,12 +2479,14 @@ async function handleAdminFileSelect() {
             if (data.secure_url) {
                 // On met l'URL dans le champ de saisie
 
-                const input = document.getElementById('msgInput');
-                input.value = (input.value ? input.value + "\n" : "") + data.secure_url;
-
+                // ✅ APRÈS (utilise le canal déjà prévu dans handleSend)
+                window.templateMediaUrl = data.secure_url;
+                
                 // On envoie direct dans le chat
-                await handleSend(); 
+                await handleSend();
                 alert("Fichier envoyé avec succès !");
+
+
             }
         } else {
             alert("Erreur lors de l'envoi à Cloudinary.");
