@@ -179,7 +179,7 @@ body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100v
 .auth-container {
     padding: 20px;
     text-align: center;
-    margin-top: -150px; /* Ajoute cette ligne pour faire remonter le bloc vers le haut */
+    margin-top: -140px; /* Ajoute cette ligne pour faire remonter le bloc vers le haut */
 }
 
 /* Style pour les zones de saisie privées et diffusion */
