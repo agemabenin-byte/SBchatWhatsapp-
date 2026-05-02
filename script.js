@@ -2478,12 +2478,13 @@ async function handleAdminFileSelect() {
             const data = JSON.parse(xhr.responseText);
             if (data.secure_url) {
                 // On met l'URL dans le champ de saisie
+
                 const input = document.getElementById('msgInput');
                 input.value = (input.value ? input.value + "\n" : "") + data.secure_url;
-                
+
                 // On envoie direct dans le chat
                 await handleSend(); 
-                alert("Fichier lourd diffusé avec succès !");
+                alert("Fichier envoyé avec succès !");
             }
         } else {
             alert("Erreur lors de l'envoi à Cloudinary.");
