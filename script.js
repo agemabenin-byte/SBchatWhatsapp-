@@ -217,6 +217,54 @@ async function estUtilisateurBloque(senderId) {
     return data !== null;
 }
 
+// ─── HELPER : upload Cloudinary avec barre de progression ────────────────────
+function uploadWithProgress(formData, url) {
+    return new Promise((resolve, reject) => {
+        const progressContainer = document.getElementById('upload-progress-container');
+        const progressBar       = document.getElementById('upload-progress-bar');
+        const progressText      = document.getElementById('upload-progress-text');
+
+        // Afficher l'overlay
+        progressContainer.style.display = 'flex';
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                const pct = Math.round((e.loaded / e.total) * 100);
+                progressBar.style.width = pct + '%';
+                progressText.textContent = pct + '%';
+            }
+        });
+
+        xhr.addEventListener('load', () => {
+            progressContainer.style.display = 'none';
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try { resolve(JSON.parse(xhr.responseText)); }
+                catch (e) { reject(new Error('Réponse Cloudinary invalide')); }
+            } else {
+                reject(new Error('Erreur HTTP ' + xhr.status));
+            }
+        });
+
+        xhr.addEventListener('error', () => {
+            progressContainer.style.display = 'none';
+            reject(new Error('Erreur réseau lors de l\'upload'));
+        });
+
+        xhr.addEventListener('abort', () => {
+            progressContainer.style.display = 'none';
+            reject(new Error('Upload annulé'));
+        });
+
+        xhr.open('POST', url);
+        xhr.send(formData);
+    });
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function handleSend() {
     if(currentProfile && currentProfile.is_banned) return alert("Vous êtes banni du groupe !");
     const content = getEditorContent('msgInput').trim();
@@ -238,11 +286,7 @@ async function handleSend() {
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('upload_preset', "video_preset");
-                console.log('Envoi vers dn3vf0mhm/video/upload avec preset video_preset');
-                const response = await fetch(`https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`, {
-                    method: 'POST', body: formData
-                });
-                const data = await response.json();
+                const data = await uploadWithProgress(formData, `https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`);
                 console.log('Réponse Cloudinary vidéo:', data);
                 if(data.secure_url) {
                     url = data.secure_url;
@@ -256,10 +300,7 @@ async function handleSend() {
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('upload_preset', "chat_preset");
-                const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
-                    method: 'POST', body: formData
-                });
-                const data = await response.json();
+                const data = await uploadWithProgress(formData, `https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`);
                 if(data.secure_url) url = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
                 else throw new Error("URL image manquante");
             }
@@ -337,21 +378,14 @@ async function executeSendPrivate() {
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('upload_preset', "video_preset");
-                console.log('Envoi vers dn3vf0mhm/video/upload avec preset video_preset');
-                const response = await fetch(`https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`, {
-                    method: 'POST', body: formData
-                });
-                const data = await response.json();
+                const data = await uploadWithProgress(formData, `https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`);
                 if(data.secure_url) mediaUrl = data.secure_url;
                 else throw new Error("URL vidéo manquante");
             } else {
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('upload_preset', "chat_preset");
-                const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
-                    method: 'POST', body: formData
-                });
-                const data = await response.json();
+                const data = await uploadWithProgress(formData, `https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`);
                 if(data.secure_url) mediaUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
             }
         } catch (err) { 
@@ -543,10 +577,7 @@ async function executeBroadcast() {
                 formData.append('file', file);
                 formData.append('upload_preset', "video_preset");
                 
-                const response = await fetch(`https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`, {
-                    method: 'POST', body: formData
-                });
-                const data = await response.json();
+                const data = await uploadWithProgress(formData, `https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`);
                 
                 if(data.secure_url) {
                     mediaUrl = data.secure_url; // L'URL finale pour la table inbox
@@ -559,10 +590,7 @@ async function executeBroadcast() {
                 formData.append('file', file);
                 formData.append('upload_preset', "chat_preset");
                 
-                const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
-                    method: 'POST', body: formData
-                });
-                const data = await response.json();
+                const data = await uploadWithProgress(formData, `https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`);
                 
                 // Optimisation du média si l'upload a réussi
                 if(data.secure_url) {
@@ -1663,21 +1691,14 @@ async function saveTemplate() {
             const formData = new FormData();
             formData.append('file', imageFile);
             formData.append('upload_preset', "chat_preset");
-            const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
-                method: 'POST', body: formData
-            });
-            const data = await response.json();
+            const data = await uploadWithProgress(formData, `https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`);
             if (data.secure_url) mediaUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
         } else if (videoFile) {
             console.log('Upload vidéo template détecté:', videoFile.name, videoFile.type);
             const formData = new FormData();
             formData.append('file', videoFile);
             formData.append('upload_preset', "video_preset");
-            console.log('Envoi vers dn3vf0mhm/video/upload avec preset video_preset');
-            const response = await fetch(`https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`, {
-                method: 'POST', body: formData
-            });
-            const data = await response.json();
+            const data = await uploadWithProgress(formData, `https://api.cloudinary.com/v1_1/dn3vf0mhm/video/upload`);
             if(data.secure_url) mediaUrl = data.secure_url;
             else throw new Error("URL vidéo manquante");
         }
@@ -2896,12 +2917,7 @@ async function handleGroupBackgroundChange() {
                 formData.append('file', file);
                 formData.append('upload_preset', "chat_preset");
                 
-                const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
-                    method: 'POST', 
-                    body: formData
-                });
-                
-                const data = await response.json();
+                const data = await uploadWithProgress(formData, `https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`);
                 if (!data.secure_url) throw new Error("Upload échoué");
                 
                 const imageUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
@@ -2943,12 +2959,7 @@ async function handleInboxBackgroundChange() {
                 formData.append('file', file);
                 formData.append('upload_preset', "chat_preset");
                 
-                const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
-                    method: 'POST', 
-                    body: formData
-                });
-                
-                const data = await response.json();
+                const data = await uploadWithProgress(formData, `https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`);
                 if (!data.secure_url) throw new Error("Upload échoué");
                 
                 const imageUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
@@ -2990,12 +3001,7 @@ async function handleMembersBackgroundChange() {
                 formData.append('file', file);
                 formData.append('upload_preset', "chat_preset");
                 
-                const response = await fetch(`https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`, {
-                    method: 'POST', 
-                    body: formData
-                });
-                
-                const data = await response.json();
+                const data = await uploadWithProgress(formData, `https://api.cloudinary.com/v1_1/dtkssnhub/image/upload`);
                 if (!data.secure_url) throw new Error("Upload échoué");
                 
                 const imageUrl = data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
