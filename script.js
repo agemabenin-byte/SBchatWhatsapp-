@@ -7,56 +7,107 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ═══════════════════════════════════════════════════════
 let deferredPrompt = null;
 
-// Enregistrer le Service Worker
+// Enregistrer le Service Worker dès que possible
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('✅ Service Worker enregistré:', reg.scope))
-            .catch(err => console.log('❌ Service Worker erreur:', err));
-    });
+    navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('✅ Service Worker enregistré:', reg.scope))
+        .catch(err => console.log('❌ Service Worker erreur:', err));
 }
 
-// Capturer l'événement d'installation PWA
+// Capturer l'événement DÈS qu'il se déclenche (avant tout clic)
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
+    console.log('✅ beforeinstallprompt capturé — prêt à installer');
 });
 
-// Fonction pour déclencher l'installation de l'app
+// Fonction principale d'installation
 async function installPWA() {
     // Fermer le menu
     document.getElementById('adminDropdown').style.display = 'none';
 
-    if (!deferredPrompt) {
-        // Fallback : instructions manuelles si l'événement n'est pas disponible
-        alert(
-            '📲 Pour installer SB App sur votre bureau :\n\n' +
-            '📱 Android / Chrome :\n' +
-            'Menu ⋮ → "Ajouter à l\'écran d\'accueil"\n\n' +
-            '🍎 iPhone / Safari :\n' +
-            'Bouton Partager ↑ → "Sur l\'écran d\'accueil"\n\n' +
-            '💻 PC / Chrome :\n' +
-            'Icône ⊕ dans la barre d\'adresse → "Installer"'
-        );
+    // Cas 1 : L'app est déjà installée (mode standalone = lancée depuis l'icône)
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+        showPWAToast('✅ SB App est déjà installée sur votre appareil !');
         return;
     }
 
-    // Déclencher la boîte de dialogue native d'installation
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-
-    if (outcome === 'accepted') {
-        console.log('✅ Application installée avec succès !');
-    } else {
-        console.log('❌ Installation refusée par l\'utilisateur.');
+    // Cas 2 : Le prompt natif est disponible → on l'affiche directement
+    if (deferredPrompt) {
+        try {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            deferredPrompt = null;
+            if (outcome === 'accepted') {
+                console.log('✅ Installation acceptée !');
+            } else {
+                // L'utilisateur a annulé — on re-écoute pour la prochaine fois
+                console.log('ℹ️ Installation annulée par l\'utilisateur.');
+            }
+        } catch (err) {
+            console.error('Erreur prompt PWA:', err);
+        }
+        return;
     }
 
-    deferredPrompt = null;
+    // Cas 3 : Le prompt n'est pas encore prêt (page vient de charger)
+    // On attend jusqu'à 5 secondes qu'il arrive
+    showPWAToast('⏳ Préparation de l\'installation...');
+    let waited = 0;
+    const waitForPrompt = setInterval(async () => {
+        waited += 500;
+        if (deferredPrompt) {
+            clearInterval(waitForPrompt);
+            hidePWAToast();
+            try {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                deferredPrompt = null;
+                console.log('Installation outcome:', outcome);
+            } catch (err) {
+                console.error('Erreur prompt PWA:', err);
+            }
+        } else if (waited >= 5000) {
+            clearInterval(waitForPrompt);
+            hidePWAToast();
+            // Dernier recours : l'app est peut-être déjà installée ou le navigateur ne supporte pas
+            showPWAToast('ℹ️ App déjà installée ou utilisez le menu ⊕ de votre navigateur', 4000);
+        }
+    }, 500);
 }
 
-// Le bouton reste toujours visible — on note juste l'installation dans la console
+// Toast discret (remplace l'alert)
+function showPWAToast(message, duration = 3000) {
+    let toast = document.getElementById('pwa-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'pwa-toast';
+        toast.style.cssText = `
+            position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.85); color: white; padding: 12px 20px;
+            border-radius: 25px; font-size: 14px; z-index: 99999;
+            text-align: center; max-width: 85%; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: opacity 0.3s;
+        `;
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.opacity = '1';
+    toast.style.display = 'block';
+    if (duration > 0) {
+        setTimeout(() => hidePWAToast(), duration);
+    }
+}
+
+function hidePWAToast() {
+    const toast = document.getElementById('pwa-toast');
+    if (toast) { toast.style.opacity = '0'; setTimeout(() => { toast.style.display = 'none'; }, 300); }
+}
+
+// Quand l'app est installée avec succès
 window.addEventListener('appinstalled', () => {
     deferredPrompt = null;
+    showPWAToast('🎉 SB App installée avec succès !', 3000);
     console.log('✅ SB App installée sur le bureau !');
 });
 // ═══════════════════════════════════════════════════════
