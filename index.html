@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SuccesBonheur WhatsApp Pro</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#25D366">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SB App">
+    <link rel="apple-touch-icon" href="https://res.cloudinary.com/dtkssnhub/image/upload/q_auto/f_auto/v1776275286/Logo_SB_TRANSPARENT_es33z1.png">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -82,6 +89,7 @@
                 <button onclick="showMessageTemplates()" id="templates-btn" style="display:none;">📋 Modèles Messages - Catalogues</button> 
                 <button onclick="exporterContacts()" id="export-btn" style="display:none;">📥 Exporter EXCEL (XLS)</button>
                <button onclick="showView('page-settings')" id="settings-btn" style="display:none;">⚙️ Paramètres</button>
+                <button id="install-pwa-btn" onclick="installPWA()" style="background:#25D366; color:white; font-weight:bold; border-radius:8px; display:none;">📲 Installer SB App sur le Bureau</button>
                 <button onclick="showView('page-about')">ℹ️ À propos</button>
                 <button onclick="handleLogout()" style="color:red;">🚪 Déconnexion</button>
             </div>
