@@ -2,6 +2,72 @@ const SUPABASE_URL = 'https://jukfjoljkaoeicopjuwo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_zvBTaDrffaATEPI7Wbu4OQ_w8ZR6chX'; 
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// ═══════════════════════════════════════════════════════
+// 📲 INSTALLATION PWA - SB APP SUR LE BUREAU
+// ═══════════════════════════════════════════════════════
+let deferredPrompt = null;
+
+// Enregistrer le Service Worker
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('✅ Service Worker enregistré:', reg.scope))
+            .catch(err => console.log('❌ Service Worker erreur:', err));
+    });
+}
+
+// Capturer l'événement d'installation PWA
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Afficher le bouton d'installation pour TOUS les utilisateurs
+    const installBtn = document.getElementById('install-pwa-btn');
+    if (installBtn) installBtn.style.display = 'block';
+});
+
+// Fonction pour déclencher l'installation de l'app
+async function installPWA() {
+    // Fermer le menu
+    document.getElementById('adminDropdown').style.display = 'none';
+
+    if (!deferredPrompt) {
+        // Fallback : instructions manuelles si l'événement n'est pas disponible
+        alert(
+            '📲 Pour installer SB App sur votre bureau :\n\n' +
+            '📱 Android / Chrome :\n' +
+            'Menu ⋮ → "Ajouter à l\'écran d\'accueil"\n\n' +
+            '🍎 iPhone / Safari :\n' +
+            'Bouton Partager ↑ → "Sur l\'écran d\'accueil"\n\n' +
+            '💻 PC / Chrome :\n' +
+            'Icône ⊕ dans la barre d\'adresse → "Installer"'
+        );
+        return;
+    }
+
+    // Déclencher la boîte de dialogue native d'installation
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+
+    if (outcome === 'accepted') {
+        console.log('✅ Application installée avec succès !');
+    } else {
+        console.log('❌ Installation refusée par l\'utilisateur.');
+    }
+
+    deferredPrompt = null;
+    const installBtn = document.getElementById('install-pwa-btn');
+    if (installBtn) installBtn.style.display = 'none';
+}
+
+// Masquer le bouton si l'app est déjà installée
+window.addEventListener('appinstalled', () => {
+    deferredPrompt = null;
+    const installBtn = document.getElementById('install-pwa-btn');
+    if (installBtn) installBtn.style.display = 'none';
+    console.log('✅ SB App installée sur le bureau !');
+});
+// ═══════════════════════════════════════════════════════
+
 const ADMINS_PHONES = ["002290140804495", "002290140804494", "002290196479181", "002290167648919", "002290195618690"];
 let currentUser = null, currentProfile = null, replyToId = null, viewHistory = ['page-login'];
 
