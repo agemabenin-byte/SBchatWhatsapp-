@@ -7,157 +7,27 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ═══════════════════════════════════════════════════════
 let deferredPrompt = null;
 
-// Enregistrer le Service Worker
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js')
         .then(reg => console.log('✅ SW enregistré:', reg.scope))
         .catch(err => console.log('❌ SW erreur:', err));
 }
 
-// Capturer le prompt natif dès qu'il arrive (Chrome, Edge)
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    console.log('✅ beforeinstallprompt capturé');
 });
 
-// Détection du navigateur
-function detectBrowser() {
-    const ua = navigator.userAgent;
-    if (ua.includes('Firefox')) return 'firefox';
-    if (ua.includes('Edg/') || ua.includes('EdgA/')) return 'edge';
-    if (ua.includes('OPR/') || ua.includes('Opera')) return 'opera';
-    if (ua.includes('Chrome')) return 'chrome';
-    if (ua.includes('Safari')) return 'safari';
-    return 'other';
-}
-
-function isMobile() {
-    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
-
-// Instructions par navigateur
-function getBrowserInstructions() {
-    const browser = detectBrowser();
-    const mobile = isMobile();
-
-    const instructions = {
-        chrome: {
-            icon: '🟢',
-            name: 'Chrome',
-            steps: mobile
-                ? ['Appuyez sur le menu <b>⋮</b> en haut à droite', 'Choisissez <b>"Ajouter à l\'écran d\'accueil"</b>', 'Appuyez sur <b>Ajouter</b>']
-                : ['Cliquez sur l\'icône <b>⊕</b> dans la barre d\'adresse', 'Cliquez sur <b>"Installer"</b>']
-        },
-        edge: {
-            icon: '🔵',
-            name: 'Edge',
-            steps: mobile
-                ? ['Appuyez sur le menu <b>···</b> en bas', 'Choisissez <b>"Ajouter à l\'téléphone"</b>', 'Appuyez sur <b>Ajouter</b>']
-                : ['Cliquez sur le menu <b>···</b> en haut à droite', 'Choisissez <b>"Applications"</b>', 'Puis <b>"Installer ce site en tant qu\'application"</b>']
-        },
-        firefox: {
-            icon: '🟠',
-            name: 'Firefox',
-            steps: mobile
-                ? ['Appuyez sur le menu <b>⋮</b> en bas à droite', 'Choisissez <b>"Installer"</b>', 'Si absent : <b>"Ajouter à l\'écran d\'accueil"</b>']
-                : ['Firefox PC ne supporte pas l\'installation directe', 'Utilisez <b>Chrome</b> ou <b>Edge</b> pour installer SB App', '<a href="https://www.google.com/chrome/" target="_blank" style="color:#25D366">Télécharger Chrome →</a>']
-        },
-        safari: {
-            icon: '⚪',
-            name: 'Safari',
-            steps: ['Appuyez sur le bouton <b>Partager ↑</b> en bas', 'Choisissez <b>"Sur l\'écran d\'accueil"</b>', 'Appuyez sur <b>Ajouter</b>']
-        },
-        opera: {
-            icon: '🔴',
-            name: 'Opera',
-            steps: mobile
-                ? ['Appuyez sur le menu <b>☰</b>', 'Choisissez <b>"Page d\'accueil"</b>', 'Puis <b>"Ajouter à l\'écran d\'accueil"</b>']
-                : ['Cliquez sur l\'icône <b>⊕</b> dans la barre d\'adresse', 'Cliquez sur <b>"Installer"</b>']
-        },
-        other: {
-            icon: '📱',
-            name: 'Votre navigateur',
-            steps: ['Cherchez l\'option <b>"Ajouter à l\'écran d\'accueil"</b>', 'Ou <b>"Installer l\'application"</b> dans le menu', 'Utilisez Chrome pour une installation plus simple']
-        }
-    };
-
-    return instructions[browser] || instructions.other;
-}
-
-// Belle popup d'instructions (remplace alert)
-function showInstallGuide() {
-    const info = getBrowserInstructions();
-    const existing = document.getElementById('pwa-guide-modal');
-    if (existing) existing.remove();
-
-    const modal = document.createElement('div');
-    modal.id = 'pwa-guide-modal';
-    modal.style.cssText = `
-        position:fixed; top:0; left:0; width:100%; height:100%;
-        background:rgba(0,0,0,0.6); z-index:99999;
-        display:flex; align-items:center; justify-content:center;
-    `;
-
-    const stepsHtml = info.steps.map(s =>
-        `<li style="padding:8px 0; border-bottom:1px solid #f0f0f0; line-height:1.5;">${s}</li>`
-    ).join('');
-
-    modal.innerHTML = `
-        <div style="background:white; border-radius:16px; padding:24px; max-width:320px; width:90%; box-shadow:0 8px 30px rgba(0,0,0,0.3); text-align:center;">
-            <div style="font-size:40px; margin-bottom:8px;">📲</div>
-            <h3 style="color:#25D366; margin:0 0 4px 0; font-size:17px;">Installer SB App</h3>
-            <p style="color:#888; font-size:12px; margin:0 0 16px 0;">${info.icon} Navigateur : ${info.name}</p>
-            <ul style="text-align:left; list-style:none; padding:0; margin:0 0 20px 0; font-size:14px; color:#333;">
-                ${stepsHtml}
-            </ul>
-            <button onclick="document.getElementById('pwa-guide-modal').remove()"
-                style="background:#25D366; color:white; border:none; padding:12px 30px; border-radius:25px; font-size:15px; font-weight:bold; cursor:pointer; width:100%;">
-                OK
-            </button>
-        </div>
-    `;
-
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
-    document.body.appendChild(modal);
-}
-
-// Fonction principale d'installation
 async function installPWA() {
     document.getElementById('adminDropdown').style.display = 'none';
-
-    // Cas 1 : prompt natif disponible → boîte native directement
-    if (deferredPrompt) {
-        try {
-            deferredPrompt.prompt();
-            await deferredPrompt.userChoice;
-        } catch(e) { console.error(e); }
-        deferredPrompt = null;
-        return;
-    }
-
-    // Cas 2 : pas encore arrivé → on attend 5 secondes
-    let waited = 0;
-    const waitInterval = setInterval(async () => {
-        waited += 300;
-        if (deferredPrompt) {
-            clearInterval(waitInterval);
-            try {
-                deferredPrompt.prompt();
-                await deferredPrompt.userChoice;
-            } catch(e) { console.error(e); }
-            deferredPrompt = null;
-        } else if (waited >= 5000) {
-            clearInterval(waitInterval);
-            // Cas 3 : navigateur sans support natif → belle popup avec guide
-            showInstallGuide();
-        }
-    }, 300);
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
 }
 
 window.addEventListener('appinstalled', () => {
     deferredPrompt = null;
-    console.log('✅ SB App installée !');
 });
 // ═══════════════════════════════════════════════════════
 
