@@ -833,9 +833,11 @@ function getEditorContent(targetId) {
     let html = editor.innerHTML;
     let text = html
         .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<\/div>/gi, '\n')
-        .replace(/<\/p>/gi, '\n')
-        .replace(/<[^>]+>/g, '')   // Supprimer les autres balises
+        .replace(/<div[^>]*>/gi, '\n')  // balise ouvrante <div> (avec ou sans attributs)
+        .replace(/<\/div>/gi, '')        // balise fermante <div> (le \n est déjà ajouté à l'ouverture)
+        .replace(/<p[^>]*>/gi, '\n')    // balise ouvrante <p>
+        .replace(/<\/p>/gi, '')          // balise fermante <p>
+        .replace(/<[^>]+>/g, '')         // Supprimer les autres balises restantes
         .replace(/&nbsp;/g, ' ')
         .replace(/&amp;/g, '&')
         .replace(/&lt;/g, '<')
