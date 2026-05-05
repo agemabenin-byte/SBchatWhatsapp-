@@ -20,9 +20,6 @@ if ('serviceWorker' in navigator) {
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    // Afficher le bouton d'installation pour TOUS les utilisateurs
-    const installBtn = document.getElementById('install-pwa-btn');
-    if (installBtn) installBtn.style.display = 'block';
 });
 
 // Fonction pour déclencher l'installation de l'app
@@ -55,15 +52,11 @@ async function installPWA() {
     }
 
     deferredPrompt = null;
-    const installBtn = document.getElementById('install-pwa-btn');
-    if (installBtn) installBtn.style.display = 'none';
 }
 
-// Masquer le bouton si l'app est déjà installée
+// Le bouton reste toujours visible — on note juste l'installation dans la console
 window.addEventListener('appinstalled', () => {
     deferredPrompt = null;
-    const installBtn = document.getElementById('install-pwa-btn');
-    if (installBtn) installBtn.style.display = 'none';
     console.log('✅ SB App installée sur le bureau !');
 });
 // ═══════════════════════════════════════════════════════
