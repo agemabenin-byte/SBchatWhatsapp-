@@ -1,0 +1,306 @@
+/* BASE & TYPO */
+body { margin:0; font-family:Arial, sans-serif; background:#efeae2; height: 100vh; width: 100vw; overflow: hidden; }
+
+/* SYSTEME DE PAGES */
+.page { 
+    display: none; 
+    flex-direction: column; 
+    height: 100vh; 
+    width: 100vw; 
+    position: fixed; 
+    top: 0; left: 0; 
+    background:#efeae2; 
+}
+
+/* HEADER FIXE */
+.header { 
+    background:#25D366; 
+    color:white; 
+    padding:10px; 
+    margin: 5px; 
+    border-radius: 20px; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+    z-index: 10;
+}
+
+/* Positionnement du bouton menu à droite */
+#adminMenuBtn { 
+    position: absolute; 
+    right: 15px; /* Le colle à 15 pixels du bord droit */
+    cursor: pointer; 
+    font-size: 24px; 
+    display: block;
+    padding: 5px; /* Zone de clic plus large */
+}
+
+/* ZONE DES MESSAGES (Prend tout l'espace restant) */
+.messages { 
+    flex: 1; 
+    overflow-y: auto; 
+    display: flex; 
+    flex-direction: column; 
+    padding: 10px;
+    /* MARGE DE SÉCURITÉ : On ajoute 80px en bas pour que le dernier message 
+       ne soit jamais caché par la barre d'envoi fixe */
+    padding-bottom: 100px !important; 
+    -webkit-overflow-scrolling: touch;
+}
+
+.msg { 
+    max-width:75%; padding:8px; margin:5px; border-radius:10px; 
+    box-shadow: 0 1px 1px rgba(0,0,0,0.1); position: relative;
+}
+.me { background:#dcf8c6; align-self:flex-end; }
+.other { background:white; align-self:flex-start; border: 1px solid #ddd; }
+.chat-img { max-width: 100%; border-radius: 8px; display: block; }
+
+/* ZONE DE SAISIE (Toujours en bas) */
+.input-area-container { 
+    background: white; 
+    padding: 10px; 
+    border-top: 1px solid #ddd;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 9998; /* Élevé mais inférieur aux boutons */
+    /* Espace pour éviter que la barre système Android cache le bouton */
+    padding-bottom: 15px;
+}
+.input-area { display:flex; align-items: flex-end; gap: 8px; }
+
+#msgInput, #broadcast-msg, #edit-msg { 
+    flex:1; padding:10px; border-radius:15px; border:1px solid #ddd; 
+    outline:none; resize: none; max-height: 100px; font-family: inherit;
+    min-height: 20px;
+    line-height: 1.4;
+    overflow-y: auto;
+}
+
+/* Styles pour les contenteditable */
+#msgInput:empty:before, #broadcast-msg:empty:before, #edit-msg:empty:before {
+    content: attr(placeholder);
+    color: #999;
+    font-style: italic;
+}
+
+#msgInput:focus, #broadcast-msg:focus, #edit-msg:focus {
+    border-color: #25D366;
+}
+#sendBtn { 
+    background:#25D366; color:white; border:none; 
+    width:45px; height:45px; border-radius:50%; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+}
+
+/* MENU DÉROULANT */
+.dropdown-content { 
+    display: none; position: absolute; right: 15px; top: 85px; 
+    background: white; min-width: 180px; box-shadow: 0 8px 16px rgba(0,0,0,0.2); 
+    z-index: 100; border-radius: 10px; overflow: hidden; 
+}
+.dropdown-content button { 
+    width: 100%; padding: 12px; border: none; background: none; 
+    text-align: left; border-bottom: 1px solid #eee; 
+}
+
+/* DESIGN DE LA PAGE LOGIN */
+#page-login {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 0;
+    text-align: center;
+}
+
+#page-login input {
+    width: 85%;
+    max-width: 300px;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    outline: none;
+    /* On s'assure que le champ ne dépasse pas */
+    box-sizing: border-box;
+}
+
+#page-login button {
+    background: #25D366;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+    width: 90%;
+    max-width: 300px;
+}
+
+#page-login h2 { color: #075E54; margin-bottom: 5px; }
+
+.password-container {
+    width: 85%;
+    max-width: 300px;
+    position: relative; /* Pour que l'œil se place par rapport à ce bloc */
+    margin: 8px auto;   /* Garde le centrage parfait */
+}
+
+.password-container input {
+    width: 100% !important; /* Prend toute la place du conteneur */
+    margin: 0 !important;   /* Annule la marge ici car elle est sur le parent */
+    padding-right: 40px;    /* Laisse de la place pour l'icône à droite */
+}
+
+.toggle-password {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    font-size: 18px;
+    z-index: 10;
+}
+
+
+.auth-logo {
+    width: 140px;          /* Taille idéale pour mobile */
+    height: auto;
+    display: block;
+    margin: 0 auto 15px;  /* 0 auto pour centrer, 15px d'espace avec le titre */
+    filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.1)); /* Optionnel : ajoute une légère ombre douce */
+}
+
+.auth-container {
+    padding: 20px;
+    text-align: center;
+    margin-top: -140px; /* Ajoute cette ligne pour faire remonter le bloc vers le haut */
+}
+
+/* Style pour les zones de saisie privées et diffusion */
+.editor-container {
+    padding: 20px;
+    text-align: center;
+    margin-top: 70px; /* On donne de l'espace positif pour descendre sous l'entête vert */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Barre d'outils de formatage */
+.formatting-toolbar {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 8px;
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 9999; /* Très élevé pour passer au-dessus du menu Android */
+}
+
+.formatting-toolbar button {
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 14px;
+    min-width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.formatting-toolbar button:hover {
+    background: #e0e0e0;
+}
+
+.format-btn {
+    background: #25D366 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 50% !important;
+    width: 35px !important;
+    height: 35px !important;
+    font-size: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    position: relative;
+    z-index: 9999; /* Très élevé pour passer au-dessus du menu Android */
+}
+
+.color-picker {
+    display: flex;
+    gap: 3px;
+}
+
+.color-picker button {
+    width: 25px !important;
+    height: 25px !important;
+    padding: 0 !important;
+    font-size: 10px !important;
+    font-weight: bold !important;
+}
+
+/* Sélecteur d'émoticônes */
+.emoji-picker {
+    position: absolute;
+    bottom: 100px;
+    left: 10px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    z-index: 9999; /* Très élevé pour passer au-dessus du menu Android */
+    max-width: 300px;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+}
+
+.emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 5px;
+}
+
+.emoji-btn {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 5px;
+    width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.emoji-btn:hover {
+    background: #f0f0f0;
+}
+
+.emoji-category {
+    font-size: 12px;
+    font-weight: bold;
+    color: #666;
+    margin: 10px 0 5px 0;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 3px;
+}
