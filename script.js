@@ -1242,7 +1242,11 @@ async function loadChat() {
     const { data } = await _supabase.from('messages').select('*').order('id', {ascending: true});
     const box = document.getElementById('chat-box');
     box.innerHTML = "";
-    if(data) data.forEach(m => renderMsg(m));
+    if(data) {
+        for (const m of data) {
+            await renderMsg(m);
+        }
+    }
     box.scrollTop = box.scrollHeight;
 }
 
